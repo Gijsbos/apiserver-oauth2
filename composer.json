@@ -1,0 +1,34 @@
+{
+    "name": "gijsbos/apiserver-oauth2",
+    "description": "API Server OAuth2",
+    "keywords": [
+        "apiserver oauth2",
+        "oauth2",
+        "apiserver",
+        "api server",
+        "api",
+        "php api"
+    ],
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Gijs and contributors",
+            "homepage": "https://github.com/gijsbos/apiserver-oauth2/graphs/contributors"
+        }
+    ],
+    "require-dev": {
+        "phpunit/phpunit": "^10.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "gijsbos\\ApiServer\\OAuth2\\": "src/"
+        }
+    },
+    "require": {
+        "gijsbos/apiserver": "^1.9",
+        "gijsbos/http": "^1.2",
+        "web-token/jwt-framework": "^4.2",
+        "psr/clock": "^1.0"
+    }
+}

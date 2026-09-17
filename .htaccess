@@ -1,0 +1,23 @@
+# Turn on rewrite engine
+RewriteEngine On
+
+# Allow cross domain access
+Header Add Access-Control-Allow-Origin "*"
+
+# Allow auth headers to be send
+RewriteCond %{HTTP:Authorization} ^(.*)
+RewriteRule .* - [e=HTTP_AUTHORIZATION:%1]
+
+# Allow symbolic links
+Options FollowSymLinks
+
+# Disable directory browsing
+Options All -Indexes
+IndexIgnore *
+
+# Redirect index page request to Server.php
+DirectoryIndex index.php
+
+# Redirect all traffic to indx.php
+RewriteCond %{REQUEST_URI} ^(.*)$ [NC]
+RewriteRule ^(.*)$ index.php [L,QSA]
