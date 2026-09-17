@@ -135,16 +135,16 @@
         },
         {
             "name": "gijsbos/apiserver",
-            "version": "1.10",
+            "version": "1.11",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Gijsbos/apiserver.git",
-                "reference": "da74c3848377e4fb44c62f3f75cd8d10e7b5e7b9"
+                "reference": "016f61959df17a1d3d0de80a48b214cb6183ed9a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Gijsbos/apiserver/zipball/da74c3848377e4fb44c62f3f75cd8d10e7b5e7b9",
-                "reference": "da74c3848377e4fb44c62f3f75cd8d10e7b5e7b9",
+                "url": "https://api.github.com/repos/Gijsbos/apiserver/zipball/016f61959df17a1d3d0de80a48b214cb6183ed9a",
+                "reference": "016f61959df17a1d3d0de80a48b214cb6183ed9a",
                 "shasum": ""
             },
             "require": {
@@ -183,9 +183,9 @@
             ],
             "support": {
                 "issues": "https://github.com/Gijsbos/apiserver/issues",
-                "source": "https://github.com/Gijsbos/apiserver/tree/1.10"
+                "source": "https://github.com/Gijsbos/apiserver/tree/1.11"
             },
-            "time": "2026-09-17T09:08:32+00:00"
+            "time": "2026-09-17T18:12:05+00:00"
         },
         {
             "name": "gijsbos/classparser",

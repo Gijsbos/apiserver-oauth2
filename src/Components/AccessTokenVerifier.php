@@ -34,12 +34,13 @@ class AccessTokenVerifier
     private SystemClock $clock;
 
     public function __construct(
-        private AccessTokenVerificationPolicy $policy,
+        private AccessTokenVerificationPolicy $accessTokenVerificationPolicy,
         null|JwksResolver $jwksResolver = null,
         null|SystemClock $clock = null
     )
     {
-        $this->jwksResolver = $jwksResolver ?? new JwksResolver($policy);
+        $this->accessTokenVerificationPolicy = $accessTokenVerificationPolicy;
+        $this->jwksResolver = $jwksResolver ?? new JwksResolver($this->accessTokenVerificationPolicy);
         $this->clock = $clock ?? new SystemClock();
     }
 
@@ -57,9 +58,9 @@ class AccessTokenVerifier
 
     private function checkHeader(JWS $jws) : void
     {
-        $mandatory = $this->policy->kidRequired ? ["alg", "kid"] : ["alg"];
+        $mandatory = $this->accessTokenVerificationPolicy->kidRequired ? ["alg", "kid"] : ["alg"];
 
-        $algorithmNames = array_map(fn(Algorithm $algorithm) => $algorithm->name(), $this->policy->allowedAlgorithms);
+        $algorithmNames = array_map(fn(Algorithm $algorithm) => $algorithm->name(), $this->accessTokenVerificationPolicy->allowedAlgorithms);
 
         $headerCheckerManager = new HeaderCheckerManager(
             [new AlgorithmChecker($algorithmNames)],
@@ -82,7 +83,7 @@ class AccessTokenVerifier
         $kid = $signature->hasProtectedHeaderParameter("kid") ? $signature->getProtectedHeaderParameter("kid") : null;
 
         $jwsVerifier = new JWSVerifier(
-            new AlgorithmManager($this->policy->allowedAlgorithms)
+            new AlgorithmManager($this->accessTokenVerificationPolicy->allowedAlgorithms)
         );
 
         if(is_string($kid))
@@ -118,15 +119,15 @@ class AccessTokenVerifier
 
         $mandatory = ["exp"];
 
-        if($this->policy->issuerUri !== null)
+        if($this->accessTokenVerificationPolicy->issuerUri !== null)
         {
-            $checkers[] = new IssuerChecker([$this->policy->issuerUri]);
+            $checkers[] = new IssuerChecker([$this->accessTokenVerificationPolicy->issuerUri]);
             $mandatory[] = "iss";
         }
 
-        if($this->policy->audience !== null)
+        if($this->accessTokenVerificationPolicy->audience !== null)
         {
-            $checkers[] = new AudienceChecker($this->policy->audience);
+            $checkers[] = new AudienceChecker($this->accessTokenVerificationPolicy->audience);
             $mandatory[] = "aud";
         }
 

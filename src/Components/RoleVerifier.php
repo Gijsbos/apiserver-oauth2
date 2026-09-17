@@ -6,6 +6,7 @@ namespace gijsbos\ApiServer\OAuth2\Components;
 use gijsbos\ApiServer\Attributes\Route;
 use gijsbos\ApiServer\Interfaces\AuthorityCheckInterface;
 use gijsbos\Http\Exceptions\ForbiddenException;
+use gijsbos\Http\Exceptions\InternalServerErrorException;
 
 /**
  * RoleVerifier
@@ -18,13 +19,18 @@ use gijsbos\Http\Exceptions\ForbiddenException;
 final class RoleVerifier implements AuthorityCheckInterface
 {
     public function __construct(
-        private array $requiredRoles
+        private array $requiredRoles,
     )
     { }
 
     public function execute(Route $route) : void
     {
-        $payload = AccessTokenPayloadResolver::resolve();
+        $authenticationVerifier = $route->getServer()->getAuthenticationVerifier();
+
+        if(!$authenticationVerifier)
+            throw new InternalServerErrorException("authenticationVerifierNotSet", "Cannot verify scope, an instance of authenticationVerifier must be initialised");
+
+        $payload = AccessTokenPayloadExtracter::extract($authenticationVerifier);
 
         if(array_key_exists("roles", $payload))
             $payloadRoles = $payload["roles"];

@@ -34,12 +34,6 @@ define("EXAMPLE_KEY_SET", new JWK([
     'qi' => 'uTs7N39yehXvv72crSTLOuSNDFGD2t3NFZyKRypT2ZYEURvRoydqEZwd8vk6vXt7gKabeyy20IHZEqwM8v9zVjWifMb_TCLJ_s7_sF3v987HNTT-9GIRLqXg8FrexQ2HIWgO96m2qZtv1Axhb3Xejjx4nIUpdGbBd73SpLpRA98',
 ]));
 
-// Add a default access token verification policy
-OAuth2Server::addAccessTokenVerificationPolicy(new AccessTokenVerificationPolicy(
-    keys: EXAMPLE_KEY_SET->toPublic()->all(),
-    kidRequired: true
-));
-
 // Add the real public/protected paths, e.g.:
 //   ->permitAll("/health", "/.well-known/**")
 //   ->requireAuth("/user/**")
