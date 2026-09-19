@@ -1,19 +1,19 @@
 <?php
 declare(strict_types=1);
 
+use gijsbos\ApiServer\OAuth2\Components\AccessTokenClaimToListConverter;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use gijsbos\ApiServer\OAuth2\Components\AccessTokenPayloadExtracter;
 
 /**
- * AccessTokenPayloadExtracterTest
+ * AccessTokenClaimToListConverterTest
  */
-class AccessTokenPayloadExtracterTest extends TestCase
+class AccessTokenClaimToListConverterTest extends TestCase
 {
     #[DataProvider('claims')]
     public function testClaimToList(mixed $claim, null|array $expected) : void
     {
-        $this->assertSame($expected, AccessTokenPayloadExtracter::claimToList($claim));
+        $this->assertSame($expected, AccessTokenClaimToListConverter::convert($claim));
     }
 
     public static function claims() : array

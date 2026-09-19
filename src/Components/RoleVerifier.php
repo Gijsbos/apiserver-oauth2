@@ -25,12 +25,12 @@ final class RoleVerifier implements AuthorityCheckInterface
 
     public function execute(Route $route, array $requiredRoles)
     {
-        $authenticationVerifier = $route->getServer()->getAuthenticationVerifier();
+        $authenticationResult = $route->getServer()->getAuthenticationResult();
 
-        if(!$authenticationVerifier)
-            throw new InternalServerErrorException("authenticationVerifierNotSet", "Cannot verify role, an instance of authenticationVerifier must be initialised");
+        if(!$authenticationResult || !is_array($authenticationResult->getData()))
+            throw new InternalServerErrorException("authenticationResultEmpty", "Cannot verify role, authentication result data empty");
 
-        $payload = AccessTokenPayloadExtracter::extract($authenticationVerifier);
+        $payload = $authenticationResult->getData();
 
         if(array_key_exists("roles", $payload))
             $payloadRoles = $payload["roles"];
@@ -41,7 +41,7 @@ final class RoleVerifier implements AuthorityCheckInterface
 
         // Role claims commonly appear as a JSON array; a delimited string
         // (comma or space) is accepted too since some issuers use that.
-        $payloadRoles = AccessTokenPayloadExtracter::claimToList($payloadRoles);
+        $payloadRoles = AccessTokenClaimToListConverter::convert($payloadRoles);
 
         if($payloadRoles === null)
             throw new ForbiddenException("insufficientRole", "The access token's \"role\" claim is malformed");

@@ -111,7 +111,7 @@ class TestController extends RouteController
     }
 
     /**
-     * publicRoute - no authority attribute, SecurityContext permits everything
+     * publicRoute - no authority attribute, SecurityContext permits it without auth
      */
     #[GetRoute('/test/public')]
     #[ReturnFilter(['ok'])]

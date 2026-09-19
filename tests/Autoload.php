@@ -35,10 +35,10 @@ define("EXAMPLE_KEY_SET", new JWK([
     'qi' => 'uTs7N39yehXvv72crSTLOuSNDFGD2t3NFZyKRypT2ZYEURvRoydqEZwd8vk6vXt7gKabeyy20IHZEqwM8v9zVjWifMb_TCLJ_s7_sF3v987HNTT-9GIRLqXg8FrexQ2HIWgO96m2qZtv1Axhb3Xejjx4nIUpdGbBd73SpLpRA98',
 ]));
 
-// Add the real public/protected paths, e.g.:
-//   ->permitAll("/health", "/.well-known/**")
-//   ->requireAuth("/user/**")
-OAuth2Server::$securityContext = new SecurityContext()->permitAll("/**");
+// The verifiers behind #[HasScope] / #[HasRole] read the result SecurityContext produces when it
+// authenticates the request, so every path with an authority attribute must require auth. Paths
+// that match no rule require auth, so only the public routes and the test IdP are permitted.
+OAuth2Server::$securityContext = new SecurityContext()->permitAll("/test/public", "/test/idp/**");
 
 // Cors::handle() is a no-op until at least one origin is set here.
 OAuth2Server::$cors = new Cors();

@@ -48,7 +48,7 @@ class AuthorityRouteTest extends TestCase
 
     public function testPublicRouteIgnoresInvalidToken() : void
     {
-        // SecurityContext permits "/**", and the route has no authority attribute, so nothing verifies the token
+        // SecurityContext permits this path without auth, so nothing verifies the token
         $this->assertAllowed($this->request("publicRoute", "not-a-token"));
     }
 

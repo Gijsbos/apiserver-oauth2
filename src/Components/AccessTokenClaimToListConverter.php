@@ -8,19 +8,19 @@ use gijsbos\ApiServer\Authentication\AuthenticationVerifier;
 use gijsbos\Http\Exceptions\UnauthorizedException;
 
 /**
- * AccessTokenPayloadExtracter
+ * AccessTokenClaimToListConverter
  */
-abstract class AccessTokenPayloadExtracter
+abstract class AccessTokenClaimToListConverter
 {
     /**
-     * claimToList
+     * convert
      *  Normalises a scope/role claim to a list of non-empty strings. Issuers emit
      *  these claims either as a delimited string (space per RFC 6749 §3.3, comma
      *  tolerated) or as a JSON array of strings. Returns null when the claim is
      *  neither, or is an array holding anything but strings - callers treat that
      *  as malformed and deny.
      */
-    public static function claimToList(mixed $claim) : null|array
+    public static function convert(mixed $claim) : null|array
     {
         if(is_string($claim))
             return preg_split('/[ ,]+/', $claim, -1, PREG_SPLIT_NO_EMPTY);
@@ -33,15 +33,5 @@ abstract class AccessTokenPayloadExtracter
                 return null;
 
         return array_values(array_filter($claim, fn(string $value) => $value !== ""));
-    }
-
-    public static function extract(AuthenticationVerifier $authenticationVerifier) : array
-    {
-        $credentials = new AuthenticationHeaderParser()->parse();
-
-        if($credentials === null)
-            throw new UnauthorizedException("authorizationRequired", "Authorization required");
-
-        return $authenticationVerifier->verify($credentials);
     }
 }

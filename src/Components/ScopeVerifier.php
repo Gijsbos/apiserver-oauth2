@@ -22,12 +22,12 @@ final class ScopeVerifier implements AuthorityCheckInterface
 
     public function execute(Route $route, array $requiredScopes)
     {
-        $authenticationVerifier = $route->getServer()->getAuthenticationVerifier();
+        $authenticationResult = $route->getServer()->getAuthenticationResult();
 
-        if(!$authenticationVerifier)
-            throw new InternalServerErrorException("authenticationVerifierNotSet", "Cannot verify scope, an instance of authenticationVerifier must be initialised");
+        if(!$authenticationResult || !is_array($authenticationResult->getData()))
+            throw new InternalServerErrorException("authenticationResultEmpty", "Cannot verify scope, authentication result data empty");
 
-        $payload = AccessTokenPayloadExtracter::extract($authenticationVerifier);
+        $payload = $authenticationResult->getData();
 
         if(array_key_exists("scp", $payload))
             $payloadScopes = $payload["scp"];
@@ -38,7 +38,7 @@ final class ScopeVerifier implements AuthorityCheckInterface
         else
             throw new ForbiddenException("insufficientScope", "The access token does not contain a \"scope\" claim");
 
-        $payloadScopes = AccessTokenPayloadExtracter::claimToList($payloadScopes);
+        $payloadScopes = AccessTokenClaimToListConverter::convert($payloadScopes);
 
         if($payloadScopes === null)
             throw new ForbiddenException("insufficientScope", "The access token's \"scope\" claim is malformed");
