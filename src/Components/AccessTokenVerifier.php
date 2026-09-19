@@ -23,6 +23,8 @@ use Jose\Component\Signature\JWSTokenSupport;
 use Jose\Component\Signature\JWSVerifier;
 use Jose\Component\Signature\Serializer\CompactSerializer;
 
+use Psr\Clock\ClockInterface;
+
 use gijsbos\Http\Exceptions\UnauthorizedException;
 
 /**
@@ -31,12 +33,12 @@ use gijsbos\Http\Exceptions\UnauthorizedException;
 class AccessTokenVerifier
 {
     private JwksResolver $jwksResolver;
-    private SystemClock $clock;
+    private ClockInterface $clock;
 
     public function __construct(
         private AccessTokenVerificationPolicy $accessTokenVerificationPolicy,
         null|JwksResolver $jwksResolver = null,
-        null|SystemClock $clock = null
+        null|ClockInterface $clock = null
     )
     {
         $this->accessTokenVerificationPolicy = $accessTokenVerificationPolicy;
@@ -101,9 +103,16 @@ class AccessTokenVerifier
         }
         else
         {
-            $jwkSet = $this->jwksResolver->getKeys();
+            try
+            {
+                $jwkSet = $this->jwksResolver->getKeys();
 
-            $isVerified = $jwsVerifier->verifyWithKeySet($jws, $jwkSet, 0);
+                $isVerified = $jwsVerifier->verifyWithKeySet($jws, $jwkSet, 0);
+            }
+            catch(InvalidArgumentException $ex)
+            {
+                throw new UnauthorizedException("tokenKeyInvalid", "The public keys could not be used to verify the access token");
+            }
         }
 
         if(!$isVerified)
@@ -145,10 +154,10 @@ class AccessTokenVerifier
 
     /**
      * verifyHasAuthority
-     *  $error/$errorDescription default to RFC 6750 §3.1's "insufficient_scope",
-     *  the correct code when checking OAuth2 scopes. Callers checking something
-     *  outside the OAuth2 spec (e.g. app-level roles) should pass their own,
-     *  since there is no RFC-standard code for that case.
+     *  $error/$errorDescription default to "insufficientScope", the camelCase form of
+     *  RFC 6750 §3.1's "insufficient_scope", the correct code when checking OAuth2
+     *  scopes. Callers checking something outside the OAuth2 spec (e.g. app-level
+     *  roles) should pass their own, since there is no RFC-standard code for that case.
      */
     public static function verifyHasAuthority(
         array $permissions,
@@ -157,8 +166,10 @@ class AccessTokenVerifier
         string $errorDescription = "The request requires higher privileges than provided by the access token"
     ) : void
     {
+        // Strict comparison, and "" never counts: loose in_array() lets e.g. true match any string,
+        // and an empty entry on both sides (from a double space or a trailing comma) must not grant access
         foreach($permissions as $permission)
-            if(in_array($permission, $requiredAuthority))
+            if($permission !== "" && in_array($permission, $requiredAuthority, true))
                 return;
 
         throw new ForbiddenException($error, $errorDescription);
@@ -172,7 +183,10 @@ class AccessTokenVerifier
 
         $this->verifySignature($jws);
 
-        $payload = json_decode($jws->getPayload(), true);
+        $payload = json_decode($jws->getPayload() ?? "", true);
+
+        if(!is_array($payload))
+            throw new UnauthorizedException("tokenPayloadInvalid", "Access token payload is not a JSON object");
 
         $this->checkClaims($payload);
 

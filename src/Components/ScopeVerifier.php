@@ -10,15 +10,17 @@ use gijsbos\Http\Exceptions\InternalServerErrorException;
 
 /**
  * ScopeVerifier
- *  Checks the current request's access token "scope" claim against a
- *  required set of scopes (OR - any one match is sufficient).
+ *  Checks the current request's access token scope claim ("scp", "scopes" or
+ *  "scope", first one present wins) against a required set of scopes (OR - any
+ *  one match is sufficient). The claim may be a delimited string (RFC 6749 §3.3)
+ *  or a JSON array of strings. Denies with "insufficientScope".
  */
 final class ScopeVerifier implements AuthorityCheckInterface
 {
     public function __construct()
     { }
 
-    public function execute(Route $route, array $requiredScopes) : void
+    public function execute(Route $route, array $requiredScopes)
     {
         $authenticationVerifier = $route->getServer()->getAuthenticationVerifier();
 
@@ -36,10 +38,10 @@ final class ScopeVerifier implements AuthorityCheckInterface
         else
             throw new ForbiddenException("insufficientScope", "The access token does not contain a \"scope\" claim");
 
-        if(!is_string($payloadScopes))
-            throw new ForbiddenException("insufficientScope", "The access token's \"scope\" claim is malformed");
+        $payloadScopes = AccessTokenPayloadExtracter::claimToList($payloadScopes);
 
-        $payloadScopes = explode(" ", str_replace(",", " ", $payloadScopes)); // RFC 6749 §3.3: scope is space-delimited
+        if($payloadScopes === null)
+            throw new ForbiddenException("insufficientScope", "The access token's \"scope\" claim is malformed");
 
         AccessTokenVerifier::verifyHasAuthority(
             $payloadScopes,

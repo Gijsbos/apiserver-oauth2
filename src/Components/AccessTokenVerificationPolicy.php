@@ -41,6 +41,9 @@ final class AccessTokenVerificationPolicy
         if($this->issuerUri === null && $this->keysUri === null && $this->keys === null)
             throw new \InvalidArgumentException("AccessTokenVerificationPolicy requires at least one of \"keys\", \"keysUri\" or \"issuerUri\"");
 
+        if(count($this->allowedAlgorithms) == 0)
+            throw new \InvalidArgumentException("AccessTokenVerificationPolicy \"allowedAlgorithms\" must contain at least one algorithm");
+
         if(count(array_filter($this->allowedAlgorithms, fn($algorithm) => $algorithm instanceof SignatureAlgorithm == false)) > 0)
             throw new \InvalidArgumentException("AccessTokenVerificationPolicy \"allowedAlgorithms\" must only contain SignatureAlgorithm instances");
     }

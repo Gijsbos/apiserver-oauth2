@@ -13,6 +13,7 @@ use Jose\Component\Core\JWK;
 include_once "vendor/autoload.php";
 
 include_once "tests/Files/TestController.php";
+include_once "tests/Files/JwtFactory.php";
 
 RouteParser::run();
 

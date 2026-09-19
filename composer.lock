@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a7cbdf7c14783f77ba1c7cffcbd59b01",
+    "content-hash": "d12a84de688b33d37f806809fe36ed8f",
     "packages": [
         {
             "name": "brick/math",
@@ -135,16 +135,16 @@
         },
         {
             "name": "gijsbos/apiserver",
-            "version": "1.12",
+            "version": "1.13",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Gijsbos/apiserver.git",
-                "reference": "4e3241589fdef3ee7453f5dd6d772e02b1bd725f"
+                "reference": "0cd0c1e75b282018140f2f1d1b1183b4646000da"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Gijsbos/apiserver/zipball/4e3241589fdef3ee7453f5dd6d772e02b1bd725f",
-                "reference": "4e3241589fdef3ee7453f5dd6d772e02b1bd725f",
+                "url": "https://api.github.com/repos/Gijsbos/apiserver/zipball/0cd0c1e75b282018140f2f1d1b1183b4646000da",
+                "reference": "0cd0c1e75b282018140f2f1d1b1183b4646000da",
                 "shasum": ""
             },
             "require": {
@@ -183,9 +183,9 @@
             ],
             "support": {
                 "issues": "https://github.com/Gijsbos/apiserver/issues",
-                "source": "https://github.com/Gijsbos/apiserver/tree/1.12"
+                "source": "https://github.com/Gijsbos/apiserver/tree/1.13"
             },
-            "time": "2026-09-19T08:04:16+00:00"
+            "time": "2026-09-19T19:54:43+00:00"
         },
         {
             "name": "gijsbos/classparser",
@@ -4544,7 +4544,9 @@
     "stability-flags": {},
     "prefer-stable": false,
     "prefer-lowest": false,
-    "platform": {},
+    "platform": {
+        "php": ">=8.4"
+    },
     "platform-dev": {},
     "plugin-api-version": "2.6.0"
 }

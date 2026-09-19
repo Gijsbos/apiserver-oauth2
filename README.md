@@ -27,7 +27,7 @@ ready-made checks (`HasScope`, `HasRole`).
 ## Requirements
 
 - **PHP**: `>= 8.4`
-- **gijsbos/apiserver**: `^1.9`
+- **gijsbos/apiserver**: `^1.13`
 - **gijsbos/http**: `^1.2`
 - **web-token/jwt-framework**: `^4.2`
 - **psr/clock**: `^1.0`
@@ -41,38 +41,39 @@ composer require gijsbos/apiserver-oauth2
 
 ## Setup
 
-### 1. Define a verification policy and register it
+### 1. Define a verification policy
 
 ```php
-use gijsbos\ApiServer\OAuth2\OAuth2Server;
 use gijsbos\ApiServer\OAuth2\Components\AccessTokenVerificationPolicy;
 
-OAuth2Server::addAccessTokenVerificationPolicy(new AccessTokenVerificationPolicy(
+$policy = new AccessTokenVerificationPolicy(
     issuerUri: "https://issuer.example.com",     // used for OIDC discovery and to validate the "iss" claim
     keysUri: "https://issuer.example.com/keys",  // or supply "keys" directly, or omit and rely on issuerUri alone
     audience: "your-api-audience",               // optional - validates the "aud" claim
     kidRequired: true,                           // optional - require a "kid" in the token header
-));
+);
 ```
 
-At least one of `keys`, `keysUri`, or `issuerUri` must be set. See the class docblock for the full
-precedence order between them (`keys` > `keysUri` > `issuerUri`) and what each one does to `iss` validation.
+At least one of `keys`, `keysUri`, or `issuerUri` must be set, and `allowedAlgorithms` (default: RS256) must
+not be empty. See the class docblock for the full precedence order between the key sources
+(`keys` > `keysUri` > `issuerUri`) and what each one does to `iss` validation.
 
 ### 2. Use `OAuth2Server` instead of `Server` in your entrypoint
 
 ```php
 use gijsbos\ApiServer\OAuth2\OAuth2Server;
 
-$server = new OAuth2Server([
+$server = new OAuth2Server($policy, [
     // same options as gijsbos\ApiServer\Server
 ]);
 
 $server->listen();
 ```
 
-`OAuth2Server` wires `AuthenticationVerifier::$viaBearer` automatically from the registered policy, so any
-`#[RequiresAuthority]`-based check — including `SecurityContext`-gated paths and `HasScope` / `HasRole` —
-can verify Bearer tokens with no further setup.
+`OAuth2Server` takes the policy as its first argument and wires `AuthenticationVerifier::$viaBearer` from it,
+so any `#[RequiresAuthority]`-based check — including `SecurityContext`-gated paths and `HasScope` /
+`HasRole` — can verify Bearer tokens with no further setup. Only the Bearer scheme is supported; `Basic`
+credentials are rejected with `schemeNotSupported`.
 
 ### 3. Gate paths broadly with `SecurityContext`
 
@@ -107,11 +108,25 @@ class UserController extends RouteController
 }
 ```
 
-`HasScope` checks the token's `scp` / `scopes` / `scope` claim (space- or comma-delimited, per RFC 6749
-§3.3) and denies with the standard `insufficient_scope` error (RFC 6750 §3.1). `HasRole` checks `role` /
-`roles` (accepts either a JSON array or a delimited string) and denies with `insufficient_role` — roles
-aren't part of the OAuth2 spec, so there's no RFC code for that case. Both attributes accept a
-comma-separated string or an array; multiple values are OR'd together.
+`HasScope` checks the token's `scp` / `scopes` / `scope` claim and `HasRole` checks `roles` / `role`. In both
+cases the first claim present wins (there is no fallback to a later one), and the claim may be either a
+delimited string (space, or comma) or a JSON array of strings. A claim of any other type, or an array holding
+anything but strings, is treated as malformed and denied. Matching is exact: case-sensitive, no prefixes.
+
+Both attributes accept a comma-separated string or an array; multiple values are OR'd together. Empty
+entries are ignored, so an attribute without any usable value can never be satisfied and always denies. When
+a route carries both `#[HasScope]` and `#[HasRole]`, both must pass.
+
+Denials are `403` responses with these error codes:
+
+| Attribute | Error code |
+| --- | --- |
+| `HasScope` | `insufficientScope` — the camelCase form of RFC 6750 §3.1's `insufficient_scope` (all error codes in this package are camelCase) |
+| `HasRole` | `insufficientRole` — roles aren't part of the OAuth2 spec, so there's no RFC code for that case |
+
+Token problems are `401` responses: `authorizationRequired`, `authorizationHeaderInvalid`, `schemeNotSupported`,
+`tokenInvalid`, `tokenHeaderInvalid`, `tokenKeyNotFound`, `tokenKeyInvalid`, `tokenPayloadInvalid`,
+`tokenKeysUnavailable` and `tokenIssuerUnavailable`.
 
 ### Custom authority checks
 
@@ -125,14 +140,15 @@ use gijsbos\ApiServer\Interfaces\AuthorityCheckInterface;
 
 class IsAccountOwnerCheck implements AuthorityCheckInterface
 {
-    public function execute(Route $route) : void
+    public function execute(Route $route, array $authority)
     {
         // Inspect $route->getData() (or look anything else up yourself),
-        // throw to deny, return normally to allow.
+        // throw to deny, return normally to allow. $authority is whatever
+        // was passed as the attribute's second argument.
     }
 }
 
-#[RequiresAuthority(IsAccountOwnerCheck::class)]
+#[RequiresAuthority(IsAccountOwnerCheck::class, [])]
 ```
 
 `HasScope` and `HasRole` are themselves just `RequiresAuthority` subclasses that supply `ScopeVerifier` /
@@ -147,9 +163,18 @@ beyond what this package ships.
 | `AccessTokenVerificationPolicy` | Configures issuer, key source, audience, allowed algorithms, `kid` requirement. |
 | `AccessTokenVerifier` | Verifies a JWT's header, signature, and standard claims (`exp`, `nbf`, `iss`, `aud`) against a policy. |
 | `JwksResolver` | Fetches public keys directly, from a URL, or via OpenID Connect discovery; caches in APCu when available. |
-| `SystemClock` | PSR-20 clock used for `exp`/`nbf` checks (injectable for testing). |
+| `SystemClock` | Default PSR-20 clock for `exp`/`nbf` checks. `AccessTokenVerifier` accepts any `Psr\Clock\ClockInterface`, e.g. a frozen clock in tests. |
 | `HasScope` / `ScopeVerifier` | Route attribute + backing check for scope-gated authorization. |
 | `HasRole` / `RoleVerifier` | Route attribute + backing check for role-gated authorization. |
+
+## Testing
+
+```
+vendor/bin/phpunit
+```
+
+The route tests send real HTTP requests to `index.php`, so the package must be served (e.g. by MAMP/Apache) and
+`BASE_URL` in `.env` must point at it, e.g. `BASE_URL=http://localhost/apiserver-oauth2`.
 
 ## Contributions
 

@@ -42,4 +42,106 @@ class TestController extends RouteController
             "token" => $authorization,
         ];
     }
+
+    /**
+     * hasAnyScope - comma-separated required scopes (OR)
+     */
+    #[GetRoute('/test/hasanyscope')]
+    #[ReturnFilter(['ok'])]
+    #[HasScope("read, write")]
+    public function hasAnyScope()
+    {
+        return ["ok" => true];
+    }
+
+    /**
+     * hasScopeArray - array of required scopes (OR)
+     */
+    #[GetRoute('/test/hasscopearray')]
+    #[ReturnFilter(['ok'])]
+    #[HasScope(["read", "write"])]
+    public function hasScopeArray()
+    {
+        return ["ok" => true];
+    }
+
+    /**
+     * hasAnyRole - comma-separated required roles (OR)
+     */
+    #[GetRoute('/test/hasanyrole')]
+    #[ReturnFilter(['ok'])]
+    #[HasRole("admin, editor")]
+    public function hasAnyRole()
+    {
+        return ["ok" => true];
+    }
+
+    /**
+     * hasRoleArray - array of required roles (OR)
+     */
+    #[GetRoute('/test/hasrolearray')]
+    #[ReturnFilter(['ok'])]
+    #[HasRole(["admin", "editor"])]
+    public function hasRoleArray()
+    {
+        return ["ok" => true];
+    }
+
+    /**
+     * hasNoUsableScope - only empty entries, can never be satisfied
+     */
+    #[GetRoute('/test/hasnousablescope')]
+    #[ReturnFilter(['ok'])]
+    #[HasScope(" , ")]
+    public function hasNoUsableScope()
+    {
+        return ["ok" => true];
+    }
+
+    /**
+     * hasScopeAndRole - both attributes must pass
+     */
+    #[GetRoute('/test/hasscopeandrole')]
+    #[ReturnFilter(['ok'])]
+    #[HasScope("test-scope")]
+    #[HasRole("test-role")]
+    public function hasScopeAndRole()
+    {
+        return ["ok" => true];
+    }
+
+    /**
+     * publicRoute - no authority attribute, SecurityContext permits everything
+     */
+    #[GetRoute('/test/public')]
+    #[ReturnFilter(['ok'])]
+    public function publicRoute()
+    {
+        return ["ok" => true];
+    }
+
+    /**
+     * jwks - serves the public example key set (target for JwksResolver "keysUri")
+     */
+    #[GetRoute('/test/idp/jwks')]
+    #[ReturnFilter(['keys'])]
+    public function jwks()
+    {
+        return ["keys" => [EXAMPLE_KEY_SET->toPublic()->all()]];
+    }
+
+    /**
+     * openIdConfiguration - serves OIDC discovery for issuer "{BASE_URL}/test/idp"
+     */
+    #[GetRoute('/test/idp/.well-known/openid-configuration')]
+    #[ReturnFilter(['issuer', 'jwks_uri'])]
+    public function openIdConfiguration()
+    {
+        $issuer = rtrim(env("BASE_URL"), "/") . "/test/idp";
+
+        return [
+            "issuer" => $issuer,
+            "jwks_uri" => "$issuer/jwks",
+        ];
+    }
 }
