@@ -19,6 +19,6 @@ class HasScope extends RequiresAuthority
     {
         $requiredScopes = is_array($scopes) ? $scopes : array_map('trim', explode(',', $scopes));
 
-        parent::__construct(fn() => new ScopeVerifier($requiredScopes));
+        parent::__construct(ScopeVerifier::class, $requiredScopes);
     }
 }

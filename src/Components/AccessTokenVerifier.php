@@ -153,7 +153,7 @@ class AccessTokenVerifier
     public static function verifyHasAuthority(
         array $permissions,
         array $requiredAuthority,
-        string $error = "insufficient_scope",
+        string $error = "insufficientScope",
         string $errorDescription = "The request requires higher privileges than provided by the access token"
     ) : void
     {

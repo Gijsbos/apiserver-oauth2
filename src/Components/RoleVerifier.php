@@ -18,12 +18,10 @@ use gijsbos\Http\Exceptions\InternalServerErrorException;
  */
 final class RoleVerifier implements AuthorityCheckInterface
 {
-    public function __construct(
-        private array $requiredRoles,
-    )
+    public function __construct()
     { }
 
-    public function execute(Route $route) : void
+    public function execute(Route $route, array $requiredRoles) : void
     {
         $authenticationVerifier = $route->getServer()->getAuthenticationVerifier();
 
@@ -37,19 +35,19 @@ final class RoleVerifier implements AuthorityCheckInterface
         else if(array_key_exists("role", $payload))
             $payloadRoles = $payload["role"];
         else
-            throw new ForbiddenException("insufficient_role", "The access token does not contain a \"role\" claim");
+            throw new ForbiddenException("insufficientRole", "The access token does not contain a \"role\" claim");
 
         // Role claims commonly appear as a JSON array; fall back to a
         // delimited string (comma or space) since some issuers use that too.
         if(is_string($payloadRoles))
             $payloadRoles = explode(" ", str_replace(",", " ", $payloadRoles));
         else if(!is_array($payloadRoles))
-            throw new ForbiddenException("insufficient_role", "The access token's \"role\" claim is malformed");
+            throw new ForbiddenException("insufficientRole", "The access token's \"role\" claim is malformed");
 
         AccessTokenVerifier::verifyHasAuthority(
             $payloadRoles,
-            $this->requiredRoles,
-            "insufficient_role",
+            $requiredRoles,
+            "insufficientRole",
             "The request requires a role not granted by the access token"
         );
     }

@@ -15,12 +15,10 @@ use gijsbos\Http\Exceptions\InternalServerErrorException;
  */
 final class ScopeVerifier implements AuthorityCheckInterface
 {
-    public function __construct(
-        private array $requiredScopes,
-    )
+    public function __construct()
     { }
 
-    public function execute(Route $route) : void
+    public function execute(Route $route, array $requiredScopes) : void
     {
         $authenticationVerifier = $route->getServer()->getAuthenticationVerifier();
 
@@ -36,17 +34,17 @@ final class ScopeVerifier implements AuthorityCheckInterface
         else if(array_key_exists("scope", $payload))
             $payloadScopes = $payload["scope"];
         else
-            throw new ForbiddenException("insufficient_scope", "The access token does not contain a \"scope\" claim");
+            throw new ForbiddenException("insufficientScope", "The access token does not contain a \"scope\" claim");
 
         if(!is_string($payloadScopes))
-            throw new ForbiddenException("insufficient_scope", "The access token's \"scope\" claim is malformed");
+            throw new ForbiddenException("insufficientScope", "The access token's \"scope\" claim is malformed");
 
         $payloadScopes = explode(" ", str_replace(",", " ", $payloadScopes)); // RFC 6749 §3.3: scope is space-delimited
 
         AccessTokenVerifier::verifyHasAuthority(
             $payloadScopes,
-            $this->requiredScopes,
-            "insufficient_scope",
+            $requiredScopes,
+            "insufficientScope",
             "The request requires higher privileges than provided by the access token"
         );
     }

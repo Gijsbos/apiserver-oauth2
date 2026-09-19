@@ -19,6 +19,6 @@ class HasRole extends RequiresAuthority
     {
         $requiredRoles = is_array($roles) ? $roles : array_map('trim', explode(',', $roles));
 
-        parent::__construct(fn() => new RoleVerifier($requiredRoles));
+        parent::__construct(RoleVerifier::class, $requiredRoles);
     }
 }

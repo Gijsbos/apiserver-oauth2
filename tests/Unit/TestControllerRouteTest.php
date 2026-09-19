@@ -101,7 +101,7 @@ class TestControllerRouteTest extends TestCase
 
         # Test Result
         $this->assertFalse($response->isSuccessful(), $response->getErrorString());
-        $this->assertEquals("insufficient_scope", $response->getError());
+        $this->assertEquals("insufficientScope", $response->getError());
     }
 
     public function testHasRole() : void
@@ -153,6 +153,6 @@ class TestControllerRouteTest extends TestCase
 
         # Test Result
         $this->assertFalse($response->isSuccessful(), $response->getErrorString());
-        $this->assertEquals("insufficient_role", $response->getError());
+        $this->assertEquals("insufficientRole", $response->getError());
     }
 }
