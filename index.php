@@ -9,7 +9,7 @@ try
 {
     $server = new OAuth2Server(
         new AccessTokenVerificationPolicy(
-            keys: EXAMPLE_KEY_SET->toPublic()->all(),
+            keys: ["keys" => [EXAMPLE_KEY_SET->toPublic()->all()]],
             kidRequired: true
         )
         ,

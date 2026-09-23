@@ -121,7 +121,7 @@ class TestController extends RouteController
     }
 
     /**
-     * jwks - serves the public example key set (target for JwksResolver "keysUri")
+     * jwks - serves the public example key set (target for CertificateProvider "keysUri")
      */
     #[GetRoute('/test/idp/jwks')]
     #[ReturnFilter(['keys'])]

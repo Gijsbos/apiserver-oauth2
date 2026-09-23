@@ -4,6 +4,9 @@ declare(strict_types=1);
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Clock\ClockInterface;
+use gijsbos\ApiServer\OAuth2\Certificate\CertificateProvider;
+use gijsbos\ApiServer\OAuth2\Certificate\CertificateProviderInterface;
+use gijsbos\ApiServer\OAuth2\Certificate\CertificateSet;
 use gijsbos\ApiServer\OAuth2\Components\AccessTokenVerificationPolicy;
 use gijsbos\ApiServer\OAuth2\Components\AccessTokenVerifier;
 use gijsbos\Http\Exceptions\ForbiddenException;
@@ -21,9 +24,11 @@ class AccessTokenVerifierTest extends TestCase
 {
     private function verifier(mixed ...$policyArgs) : AccessTokenVerifier
     {
-        $policyArgs += ["keys" => JwtFactory::publicKey()];
+        $policyArgs += ["keys" => ["keys" => [JwtFactory::publicKey()]]];
 
-        return new AccessTokenVerifier(new AccessTokenVerificationPolicy(...$policyArgs));
+        $policy = new AccessTokenVerificationPolicy(...$policyArgs);
+
+        return new AccessTokenVerifier($policy, new CertificateProvider($policy));
     }
 
     private function assertRejected(string $error, callable $verify) : void
@@ -120,7 +125,9 @@ class AccessTokenVerifierTest extends TestCase
 
     private function verifierWithClock(ClockInterface $clock) : AccessTokenVerifier
     {
-        return new AccessTokenVerifier(new AccessTokenVerificationPolicy(keys: JwtFactory::publicKey()), null, $clock);
+        $policy = new AccessTokenVerificationPolicy(keys: ["keys" => [JwtFactory::publicKey()]]);
+
+        return new AccessTokenVerifier($policy, new CertificateProvider($policy), $clock);
     }
 
     public function testInjectedClockDecidesWhenATokenExpires() : void
@@ -137,6 +144,53 @@ class AccessTokenVerifierTest extends TestCase
 
         $this->assertRejected("tokenPayloadInvalid", fn() => $this->verifierWithClock($this->clockAt("now"))->verify($token));
         $this->assertEquals("test-user", $this->verifierWithClock($this->clockAt("+2 hours"))->verify($token)["sub"]);
+    }
+
+    // ---------------------------------------------------------------------
+    // Injected certificate provider
+    // ---------------------------------------------------------------------
+
+    private function providerFor(array $keys, int &$calls = 0) : CertificateProviderInterface
+    {
+        return new class($keys, $calls) implements CertificateProviderInterface
+        {
+            public function __construct(private array $keys, private int &$calls)
+            { }
+
+            public function provide() : CertificateSet
+            {
+                $this->calls++;
+
+                return new CertificateSet($this->keys);
+            }
+        };
+    }
+
+    public function testKeysComeFromTheInjectedProviderNotThePolicy() : void
+    {
+        // The policy holds a key that cannot verify the token; only the provider's key can
+        $policy = new AccessTokenVerificationPolicy(keys: ["keys" => [JwtFactory::foreignKey()->toPublic()->all()]]);
+        $calls = 0;
+        $verifier = new AccessTokenVerifier($policy, $this->providerFor([JwtFactory::publicKey()], $calls));
+
+        $this->assertEquals("test-user", $verifier->verify(JwtFactory::mint())["sub"]);
+        $this->assertEquals(1, $calls);
+    }
+
+    public function testEmptyProvidedSetRejectsTokensWithKid() : void
+    {
+        $policy = new AccessTokenVerificationPolicy(keys: ["keys" => []]);
+        $verifier = new AccessTokenVerifier($policy, $this->providerFor([]));
+
+        $this->assertRejected("tokenKeyNotFound", fn() => $verifier->verify(JwtFactory::mint()));
+    }
+
+    public function testEmptyProvidedSetRejectsTokensWithoutKid() : void
+    {
+        $policy = new AccessTokenVerificationPolicy(keys: ["keys" => []]);
+        $verifier = new AccessTokenVerifier($policy, $this->providerFor([]));
+
+        $this->assertRejected("tokenKeyInvalid", fn() => $verifier->verify(JwtFactory::mint([], ["alg" => "RS256"])));
     }
 
     // ---------------------------------------------------------------------

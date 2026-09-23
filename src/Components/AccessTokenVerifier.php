@@ -3,8 +3,12 @@ declare(strict_types=1);
 
 namespace gijsbos\ApiServer\OAuth2\Components;
 
-use gijsbos\Http\Exceptions\ForbiddenException;
 use InvalidArgumentException;
+
+use gijsbos\Http\Exceptions\ForbiddenException;
+use gijsbos\Http\Exceptions\UnauthorizedException;
+
+use gijsbos\ApiServer\OAuth2\Certificate\CertificateProviderInterface;
 
 use Jose\Component\Checker\AlgorithmChecker;
 use Jose\Component\Checker\AudienceChecker;
@@ -25,26 +29,17 @@ use Jose\Component\Signature\Serializer\CompactSerializer;
 
 use Psr\Clock\ClockInterface;
 
-use gijsbos\Http\Exceptions\UnauthorizedException;
-
 /**
  * AccessTokenVerifier
  */
 class AccessTokenVerifier
 {
-    private JwksResolver $jwksResolver;
-    private ClockInterface $clock;
-
     public function __construct(
         private AccessTokenVerificationPolicy $accessTokenVerificationPolicy,
-        null|JwksResolver $jwksResolver = null,
-        null|ClockInterface $clock = null
+        private CertificateProviderInterface $certificateProvider,
+        private ClockInterface $clock = new SystemClock()
     )
-    {
-        $this->accessTokenVerificationPolicy = $accessTokenVerificationPolicy;
-        $this->jwksResolver = $jwksResolver ?? new JwksResolver($this->accessTokenVerificationPolicy);
-        $this->clock = $clock ?? new SystemClock();
-    }
+    { }
 
     private function unserialize(string $accessToken) : JWS
     {
@@ -92,7 +87,7 @@ class AccessTokenVerifier
         {
             try
             {
-                $jwk = $this->jwksResolver->getKey($kid);
+                $jwk = $this->certificateProvider->provide()->toJWKSet()->get($kid);
             }
             catch(InvalidArgumentException $ex)
             {
@@ -105,7 +100,7 @@ class AccessTokenVerifier
         {
             try
             {
-                $jwkSet = $this->jwksResolver->getKeys();
+                $jwkSet = $this->certificateProvider->provide()->toJWKSet();
 
                 $isVerified = $jwsVerifier->verifyWithKeySet($jws, $jwkSet, 0);
             }

@@ -12,8 +12,8 @@ use Jose\Component\Signature\Algorithm\SignatureAlgorithm;
  *  SecurityContext, which only decides whether a path needs a token at all.
  *
  *  Key source, in order of preference:
- *  keys       - raw JWK/JWKS data provided directly (a JWKS array, a list of
- *               JWKs, or a single JWK). Skips discovery and any HTTP fetch.
+ *  keys       - raw JWKS data provided directly, as {"keys": [...]}. Skips
+ *               discovery and any HTTP fetch.
  *  keysUri    - a direct JWKS URL, skipping discovery. When set without issuerUri,
  *               "iss" is not validated (no canonical issuer to check against) -
  *               matching how e.g. Spring Security's withJwkSetUri() behaves.
