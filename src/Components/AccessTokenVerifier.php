@@ -35,7 +35,6 @@ use Psr\Clock\ClockInterface;
 class AccessTokenVerifier
 {
     public function __construct(
-        private AccessTokenVerificationPolicy $accessTokenVerificationPolicy,
         private CertificateProviderInterface $certificateProvider,
         private ClockInterface $clock = new SystemClock()
     )
@@ -53,11 +52,11 @@ class AccessTokenVerifier
         }
     }
 
-    private function checkHeader(JWS $jws) : void
+    private function checkHeader(AccessTokenVerificationPolicy $accessTokenVerificationPolicy, JWS $jws) : void
     {
-        $mandatory = $this->accessTokenVerificationPolicy->kidRequired ? ["alg", "kid"] : ["alg"];
+        $mandatory = $accessTokenVerificationPolicy->kidRequired ? ["alg", "kid"] : ["alg"];
 
-        $algorithmNames = array_map(fn(Algorithm $algorithm) => $algorithm->name(), $this->accessTokenVerificationPolicy->allowedAlgorithms);
+        $algorithmNames = array_map(fn(Algorithm $algorithm) => $algorithm->name(), $accessTokenVerificationPolicy->allowedAlgorithms);
 
         $headerCheckerManager = new HeaderCheckerManager(
             [new AlgorithmChecker($algorithmNames)],
@@ -74,20 +73,20 @@ class AccessTokenVerifier
         }
     }
 
-    private function verifySignature(JWS $jws) : void
+    private function verifySignature(AccessTokenVerificationPolicy $accessTokenVerificationPolicy, JWS $jws) : void
     {
         $signature = $jws->getSignature(0);
         $kid = $signature->hasProtectedHeaderParameter("kid") ? $signature->getProtectedHeaderParameter("kid") : null;
 
         $jwsVerifier = new JWSVerifier(
-            new AlgorithmManager($this->accessTokenVerificationPolicy->allowedAlgorithms)
+            new AlgorithmManager($accessTokenVerificationPolicy->allowedAlgorithms)
         );
 
         if(is_string($kid))
         {
             try
             {
-                $jwk = $this->certificateProvider->provide()->toJWKSet()->get($kid);
+                $jwk = $this->certificateProvider->provide($accessTokenVerificationPolicy)->toJWKSet()->get($kid);
             }
             catch(InvalidArgumentException $ex)
             {
@@ -100,7 +99,7 @@ class AccessTokenVerifier
         {
             try
             {
-                $jwkSet = $this->certificateProvider->provide()->toJWKSet();
+                $jwkSet = $this->certificateProvider->provide($accessTokenVerificationPolicy)->toJWKSet();
 
                 $isVerified = $jwsVerifier->verifyWithKeySet($jws, $jwkSet, 0);
             }
@@ -114,7 +113,7 @@ class AccessTokenVerifier
             throw new UnauthorizedException("tokenInvalid", "Access token signature is invalid");
     }
 
-    private function checkClaims(array $payload) : void
+    private function checkClaims(AccessTokenVerificationPolicy $accessTokenVerificationPolicy, array $payload) : void
     {
         $checkers = [
             new ExpirationTimeChecker($this->clock),
@@ -123,15 +122,15 @@ class AccessTokenVerifier
 
         $mandatory = ["exp"];
 
-        if($this->accessTokenVerificationPolicy->issuerUri !== null)
+        if($accessTokenVerificationPolicy->issuerUri !== null)
         {
-            $checkers[] = new IssuerChecker([$this->accessTokenVerificationPolicy->issuerUri]);
+            $checkers[] = new IssuerChecker([$accessTokenVerificationPolicy->issuerUri]);
             $mandatory[] = "iss";
         }
 
-        if($this->accessTokenVerificationPolicy->audience !== null)
+        if($accessTokenVerificationPolicy->audience !== null)
         {
-            $checkers[] = new AudienceChecker($this->accessTokenVerificationPolicy->audience);
+            $checkers[] = new AudienceChecker($accessTokenVerificationPolicy->audience);
             $mandatory[] = "aud";
         }
 
@@ -170,20 +169,20 @@ class AccessTokenVerifier
         throw new ForbiddenException($error, $errorDescription);
     }
 
-    public function verify(string $accessToken) : array
+    public function verify(AccessTokenVerificationPolicy $accessTokenVerificationPolicy, string $accessToken) : array
     {
         $jws = $this->unserialize($accessToken);
 
-        $this->checkHeader($jws);
+        $this->checkHeader($accessTokenVerificationPolicy, $jws);
 
-        $this->verifySignature($jws);
+        $this->verifySignature($accessTokenVerificationPolicy, $jws);
 
         $payload = json_decode($jws->getPayload() ?? "", true);
 
         if(!is_array($payload))
             throw new UnauthorizedException("tokenPayloadInvalid", "Access token payload is not a JSON object");
 
-        $this->checkClaims($payload);
+        $this->checkClaims($accessTokenVerificationPolicy, $payload);
 
         return $payload;
     }

@@ -21,9 +21,7 @@ class OAuth2Server extends \gijsbos\ApiServer\Server
         parent::__construct($opts);
 
         $this->setAuthenticationVerifier(new AuthenticationVerifier(
-            viaBearer: fn($accessToken) => new AccessTokenVerifier(
-                $accessTokenVerificationPolicy, new CertificateProvider($accessTokenVerificationPolicy)
-            )->verify($accessToken)
+            viaBearer: fn($accessToken) => new AccessTokenVerifier(new CertificateProvider())->verify($accessTokenVerificationPolicy, $accessToken)
         ));
     }
 }

@@ -11,18 +11,10 @@ use Jose\Component\Signature\Algorithm\RS384;
  */
 class AccessTokenVerificationPolicyTest extends TestCase
 {
-    public function testRequiresAtLeastOneKeySource() : void
+    public function testKeySourceIsNotRequiredAtConstruction() : void
     {
-        $this->expectException(InvalidArgumentException::class);
-
-        new AccessTokenVerificationPolicy();
-    }
-
-    public function testAudienceAloneIsNotAKeySource() : void
-    {
-        $this->expectException(InvalidArgumentException::class);
-
-        new AccessTokenVerificationPolicy(audience: "api");
+        // The "at least one key source" check lives in CertificateProvider::provide()
+        $this->assertInstanceOf(AccessTokenVerificationPolicy::class, new AccessTokenVerificationPolicy());
     }
 
     public function testEachKeySourceIsSufficientOnItsOwn() : void

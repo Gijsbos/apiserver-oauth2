@@ -36,15 +36,28 @@ final class AccessTokenVerificationPolicy
             new RS256()
         ],
         public readonly bool $kidRequired = false,
+        public array $metadata = [],
     )
     {
-        if($this->issuerUri === null && $this->keysUri === null && $this->keys === null)
-            throw new \InvalidArgumentException("AccessTokenVerificationPolicy requires at least one of \"keys\", \"keysUri\" or \"issuerUri\"");
-
         if(count($this->allowedAlgorithms) == 0)
             throw new \InvalidArgumentException("AccessTokenVerificationPolicy \"allowedAlgorithms\" must contain at least one algorithm");
 
         if(count(array_filter($this->allowedAlgorithms, fn($algorithm) => $algorithm instanceof SignatureAlgorithm == false)) > 0)
             throw new \InvalidArgumentException("AccessTokenVerificationPolicy \"allowedAlgorithms\" must only contain SignatureAlgorithm instances");
+    }
+
+    public function addMetadata(string $key, $value)
+    {
+        $this->metadata[$key] = $value;
+    }
+
+    public function getMetadata(string $key)
+    {
+        return @$this->metadata[$key];
+    }
+
+    public function hasMetadata(string $key)
+    {
+        return array_key_exists($key, $this->metadata);
     }
 }

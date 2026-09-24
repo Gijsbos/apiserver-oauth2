@@ -29,7 +29,7 @@ class CertificateProviderTest extends TestCase
 
     private function provide(mixed ...$policyArgs) : CertificateSet
     {
-        return (new CertificateProvider(new AccessTokenVerificationPolicy(...$policyArgs)))->provide();
+        return (new CertificateProvider())->provide(new AccessTokenVerificationPolicy(...$policyArgs));
     }
 
     private function assertProvideFails(string $exceptionClass, string $error, mixed ...$policyArgs) : void
@@ -46,6 +46,24 @@ class CertificateProviderTest extends TestCase
         }
 
         $this->fail("Expected $exceptionClass \"$error\"");
+    }
+
+    // ---------------------------------------------------------------------
+    // Key source
+    // ---------------------------------------------------------------------
+
+    public function testRequiresAtLeastOneKeySource() : void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        $this->provide();
+    }
+
+    public function testAudienceAloneIsNotAKeySource() : void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        $this->provide(audience: "api");
     }
 
     // ---------------------------------------------------------------------
@@ -112,20 +130,20 @@ class CertificateProviderTest extends TestCase
     public function testVerifierAcceptsTokensSignedByKeysFetchedFromKeysUri() : void
     {
         $policy = new AccessTokenVerificationPolicy(keysUri: $this->jwksUri(), kidRequired: true);
-        $verifier = new AccessTokenVerifier($policy, new CertificateProvider($policy));
+        $verifier = new AccessTokenVerifier(new CertificateProvider());
 
-        $this->assertEquals("test-user", $verifier->verify(JwtFactory::mint())["sub"]);
+        $this->assertEquals("test-user", $verifier->verify($policy, JwtFactory::mint())["sub"]);
     }
 
     public function testVerifierValidatesIssuerFromDiscoveryConfiguration() : void
     {
         $policy = new AccessTokenVerificationPolicy(issuerUri: $this->issuerUri());
-        $verifier = new AccessTokenVerifier($policy, new CertificateProvider($policy));
+        $verifier = new AccessTokenVerifier(new CertificateProvider());
 
-        $this->assertEquals("test-user", $verifier->verify(JwtFactory::mint(["iss" => $this->issuerUri()]))["sub"]);
+        $this->assertEquals("test-user", $verifier->verify($policy, JwtFactory::mint(["iss" => $this->issuerUri()]))["sub"]);
 
         $this->expectException(UnauthorizedException::class);
 
-        $verifier->verify(JwtFactory::mint(["iss" => "https://evil.example.com"]));
+        $verifier->verify($policy, JwtFactory::mint(["iss" => "https://evil.example.com"]));
     }
 }

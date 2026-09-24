@@ -29,9 +29,7 @@ class CertificateProvider implements CertificateProviderInterface
      */
     public static $CACHE_TTL_SECONDS = 3600;
 
-    public function __construct(
-        private AccessTokenVerificationPolicy $accessTokenVerificationPolicy,
-    )
+    public function __construct()
     {}
 
     private function storeInApcuCache(string $uri, array $keys)
@@ -90,39 +88,42 @@ class CertificateProvider implements CertificateProviderInterface
     }
 
     #[Override]
-    public function provide() : CertificateSet
+    public function provide(AccessTokenVerificationPolicy $accessTokenVerificationPolicy) : CertificateSet
     {
-        if($this->accessTokenVerificationPolicy->keys !== null)
+        if($accessTokenVerificationPolicy->issuerUri === null && $accessTokenVerificationPolicy->keysUri === null && $accessTokenVerificationPolicy->keys === null)
+            throw new \InvalidArgumentException("AccessTokenVerificationPolicy requires at least one of \"keys\", \"keysUri\" or \"issuerUri\"");
+
+        if($accessTokenVerificationPolicy->keys !== null)
         {
-            return CertificateSet::createFromArray($this->accessTokenVerificationPolicy->keys);
+            return CertificateSet::createFromArray($accessTokenVerificationPolicy->keys);
         }
 
-        if($this->accessTokenVerificationPolicy->keysUri)
+        if($accessTokenVerificationPolicy->keysUri)
         {
-            $cachedKeysData = $this->retrieveFromApcuCache($this->accessTokenVerificationPolicy->keysUri);
+            $cachedKeysData = $this->retrieveFromApcuCache($accessTokenVerificationPolicy->keysUri);
 
             if($cachedKeysData !== null)
                 return CertificateSet::createFromArray($cachedKeysData);
 
-            $certificateData = $this->fetchKeysFromKeysUri($this->accessTokenVerificationPolicy->keysUri);
+            $certificateData = $this->fetchKeysFromKeysUri($accessTokenVerificationPolicy->keysUri);
 
-            $this->storeInApcuCache($this->accessTokenVerificationPolicy->keysUri, $certificateData);
+            $this->storeInApcuCache($accessTokenVerificationPolicy->keysUri, $certificateData);
 
             return CertificateSet::createFromArray($certificateData);
         }
 
-        if($this->accessTokenVerificationPolicy->issuerUri)
+        if($accessTokenVerificationPolicy->issuerUri)
         {
-            $cachedKeysData = $this->retrieveFromApcuCache($this->accessTokenVerificationPolicy->issuerUri);
+            $cachedKeysData = $this->retrieveFromApcuCache($accessTokenVerificationPolicy->issuerUri);
 
             if($cachedKeysData !== null)
                 return CertificateSet::createFromArray($cachedKeysData);
 
-            $keysUri = $this->resolveKeysUriFromIssuerUri($this->accessTokenVerificationPolicy->issuerUri);
+            $keysUri = $this->resolveKeysUriFromIssuerUri($accessTokenVerificationPolicy->issuerUri);
 
             $certificateData = $this->fetchKeysFromKeysUri($keysUri);
 
-            $this->storeInApcuCache($this->accessTokenVerificationPolicy->issuerUri, $certificateData);
+            $this->storeInApcuCache($accessTokenVerificationPolicy->issuerUri, $certificateData);
 
             return CertificateSet::createFromArray($certificateData);
         }
