@@ -20,7 +20,7 @@ class CertificateSet
     public function getKid(string $kid)
     {
         foreach($this->keys as $key)
-            if(str_equals(@$key["kid"] ?? "", $kid))
+            if(is_array($key) && ($key["kid"] ?? null) === $kid)
                 return $key;
 
         return null;
@@ -69,13 +69,18 @@ class CertificateSet
 
     public static function arrayIsCertificateSet(array $data)
     {
-        return is_array($data) && array_key_exists("keys", $data) && is_array($data["keys"]);
+        return array_key_exists("keys", $data) && is_array($data["keys"]);
     }
 
     public static function createFromArray(array $data)
     {
+        if(array_key_exists("kty", $data)) // when receiving a certificate instead, detect mandatory kty RFC 7517 §4.1 and add keys manually
+            $data = ["keys" => [$data]];
+
         if(!self::arrayIsCertificateSet($data))
+        {
             throw new InternalServerErrorException("malformedCertificateSet", "Certificate set is malformed");
+        }
 
         return new self($data["keys"]);
     }

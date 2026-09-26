@@ -30,8 +30,8 @@
     },
     "require": {
         "php": ">=8.4",
-        "gijsbos/apiserver": "^1.13",
-        "gijsbos/http": "^1.2",
+        "gijsbos/apiserver": "^1.16",
+        "gijsbos/http": "^1.4",
         "web-token/jwt-framework": "^4.2",
         "psr/clock": "^1.0"
     }

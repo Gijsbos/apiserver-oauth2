@@ -9,7 +9,9 @@ use gijsbos\Http\Exceptions\ForbiddenException;
 use gijsbos\Http\Exceptions\UnauthorizedException;
 
 use gijsbos\ApiServer\OAuth2\Certificate\CertificateProviderInterface;
-
+use gijsbos\ApiServer\OAuth2\Interfaces\AccessTokenVerifierInterface;
+use gijsbos\ApiServer\OAuth2\ValueObjects\JwtPayload;
+use gijsbos\ApiServer\OAuth2\ValueObjects\TokenPayload;
 use Jose\Component\Checker\AlgorithmChecker;
 use Jose\Component\Checker\AudienceChecker;
 use Jose\Component\Checker\ClaimCheckerManager;
@@ -32,7 +34,7 @@ use Psr\Clock\ClockInterface;
 /**
  * AccessTokenVerifier
  */
-class AccessTokenVerifier
+class AccessTokenVerifier implements AccessTokenVerifierInterface
 {
     public function __construct(
         private CertificateProviderInterface $certificateProvider,
@@ -44,22 +46,28 @@ class AccessTokenVerifier
     {
         try
         {
-            return (new CompactSerializer())->unserialize($accessToken);
+            $jws = (new CompactSerializer())->unserialize($accessToken);
         }
         catch(InvalidArgumentException $ex)
         {
             throw new UnauthorizedException("tokenInvalid", "Access token is not a valid JWT");
         }
+
+        // An empty payload segment is a detached-payload JWS, which JWSVerifier rejects by throwing rather than returning false
+        if($jws->getPayload() === null || $jws->getPayload() === "")
+            throw new UnauthorizedException("tokenInvalid", "Access token is not a valid JWT");
+
+        return $jws;
     }
 
-    private function checkHeader(AccessTokenVerificationPolicy $accessTokenVerificationPolicy, JWS $jws) : void
+    private function checkHeader(OAuth2VerificationPolicy $oAuth2VerificationPolicy, JWS $jws) : void
     {
-        $mandatory = $accessTokenVerificationPolicy->kidRequired ? ["alg", "kid"] : ["alg"];
+        $mandatory = $oAuth2VerificationPolicy->kidRequired ? ["alg", "kid"] : ["alg"];
 
-        $algorithmNames = array_map(fn(Algorithm $algorithm) => $algorithm->name(), $accessTokenVerificationPolicy->allowedAlgorithms);
+        $algorithmNames = array_map(fn(Algorithm $algorithm) => $algorithm->name(), $oAuth2VerificationPolicy->allowedAlgorithms);
 
         $headerCheckerManager = new HeaderCheckerManager(
-            [new AlgorithmChecker($algorithmNames)],
+            [new AlgorithmChecker($algorithmNames, true)],
             [new JWSTokenSupport()]
         );
 
@@ -73,20 +81,27 @@ class AccessTokenVerifier
         }
     }
 
-    private function verifySignature(AccessTokenVerificationPolicy $accessTokenVerificationPolicy, JWS $jws) : void
+    private function verifySignature(OAuth2VerificationPolicy $oAuth2VerificationPolicy, JWS $jws) : void
     {
         $signature = $jws->getSignature(0);
         $kid = $signature->hasProtectedHeaderParameter("kid") ? $signature->getProtectedHeaderParameter("kid") : null;
 
         $jwsVerifier = new JWSVerifier(
-            new AlgorithmManager($accessTokenVerificationPolicy->allowedAlgorithms)
+            new AlgorithmManager($oAuth2VerificationPolicy->allowedAlgorithms)
         );
+
+        // Outside the try blocks below: a misconfigured policy must surface as a server error, not as a rejected token
+        $certificateSet = $this->certificateProvider->provide($oAuth2VerificationPolicy);
 
         if(is_string($kid))
         {
+            // An unknown kid may be a key the issuer rotated in after the set was cached
+            if(!$certificateSet->hasKid($kid))
+                $certificateSet = $this->certificateProvider->provide($oAuth2VerificationPolicy, true);
+
             try
             {
-                $jwk = $this->certificateProvider->provide($accessTokenVerificationPolicy)->toJWKSet()->get($kid);
+                $jwk = $certificateSet->toJWKSet()->get($kid);
             }
             catch(InvalidArgumentException $ex)
             {
@@ -99,7 +114,7 @@ class AccessTokenVerifier
         {
             try
             {
-                $jwkSet = $this->certificateProvider->provide($accessTokenVerificationPolicy)->toJWKSet();
+                $jwkSet = $certificateSet->toJWKSet();
 
                 $isVerified = $jwsVerifier->verifyWithKeySet($jws, $jwkSet, 0);
             }
@@ -113,7 +128,7 @@ class AccessTokenVerifier
             throw new UnauthorizedException("tokenInvalid", "Access token signature is invalid");
     }
 
-    private function checkClaims(AccessTokenVerificationPolicy $accessTokenVerificationPolicy, array $payload) : void
+    private function checkClaims(OAuth2VerificationPolicy $oAuth2VerificationPolicy, array $payload) : void
     {
         $checkers = [
             new ExpirationTimeChecker($this->clock),
@@ -122,15 +137,15 @@ class AccessTokenVerifier
 
         $mandatory = ["exp"];
 
-        if($accessTokenVerificationPolicy->issuerUri !== null)
+        if($oAuth2VerificationPolicy->issuerUri !== null)
         {
-            $checkers[] = new IssuerChecker([$accessTokenVerificationPolicy->issuerUri]);
+            $checkers[] = new IssuerChecker([$oAuth2VerificationPolicy->issuerUri]);
             $mandatory[] = "iss";
         }
 
-        if($accessTokenVerificationPolicy->audience !== null)
+        if($oAuth2VerificationPolicy->audience !== null)
         {
-            $checkers[] = new AudienceChecker($accessTokenVerificationPolicy->audience);
+            $checkers[] = new AudienceChecker($oAuth2VerificationPolicy->audience);
             $mandatory[] = "aud";
         }
 
@@ -169,21 +184,28 @@ class AccessTokenVerifier
         throw new ForbiddenException($error, $errorDescription);
     }
 
-    public function verify(AccessTokenVerificationPolicy $accessTokenVerificationPolicy, string $accessToken) : array
+    public function verify(OAuth2VerificationPolicy $oAuth2VerificationPolicy, string $accessToken) : TokenPayload
     {
         $jws = $this->unserialize($accessToken);
 
-        $this->checkHeader($accessTokenVerificationPolicy, $jws);
+        $this->checkHeader($oAuth2VerificationPolicy, $jws);
 
-        $this->verifySignature($accessTokenVerificationPolicy, $jws);
+        $this->verifySignature($oAuth2VerificationPolicy, $jws);
 
         $payload = json_decode($jws->getPayload() ?? "", true);
 
         if(!is_array($payload))
             throw new UnauthorizedException("tokenPayloadInvalid", "Access token payload is not a JSON object");
 
-        $this->checkClaims($accessTokenVerificationPolicy, $payload);
+        $this->checkClaims($oAuth2VerificationPolicy, $payload);
 
-        return $payload;
+        try
+        {
+            return TokenPayload::createFromArray($payload);
+        }
+        catch(InvalidArgumentException $ex)
+        {
+            throw new UnauthorizedException("tokenPayloadInvalid", $ex->getMessage());
+        }
     }
 }

@@ -46,9 +46,17 @@ class CertificateSetTest extends TestCase
         $this->assertFalse(CertificateSet::createFromArray(["keys" => []])->hasKeys());
     }
 
+    public function testWrapsASingleJwkIntoASet() : void
+    {
+        $set = CertificateSet::createFromArray(JwtFactory::publicKey());
+
+        $this->assertCount(1, $set->toKeysData()["keys"]);
+        $this->assertTrue($set->hasKid(JwtFactory::kid()));
+    }
+
     public function testRejectsDataWithoutAKeysArray() : void
     {
-        foreach([JwtFactory::publicKey(), [JwtFactory::publicKey()], [], ["keys" => "not an array"]] as $data)
+        foreach([[JwtFactory::publicKey()], [], ["keys" => "not an array"]] as $data)
             $this->assertThrowsError(InternalServerErrorException::class, "malformedCertificateSet", fn() => CertificateSet::createFromArray($data));
     }
 
@@ -78,6 +86,15 @@ class CertificateSetTest extends TestCase
 
         $this->assertNull($set->getKid("unknown"));
         $this->assertFalse($set->hasKid("unknown"));
+    }
+
+    public function testGetKidSkipsMalformedEntries() : void
+    {
+        // Remote key sets are untrusted input: a non-array entry or non-string kid must not throw
+        $set = new CertificateSet(["not a key", ["kid" => ["array"]], ["kid" => 7], JwtFactory::publicKey()]);
+
+        $this->assertNull($set->getKid("7"));
+        $this->assertTrue($set->hasKid(JwtFactory::kid()));
     }
 
     public function testToKeysDataWrapsTheKeys() : void

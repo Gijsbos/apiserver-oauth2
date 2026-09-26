@@ -1,6 +1,6 @@
 <?php
 
-use gijsbos\ApiServer\OAuth2\Components\AccessTokenVerificationPolicy;
+use gijsbos\ApiServer\OAuth2\Components\OAuth2VerificationPolicy;
 use gijsbos\ApiServer\OAuth2\OAuth2Server;
 
 include_once "tests/Autoload.php";
@@ -8,7 +8,7 @@ include_once "tests/Autoload.php";
 try
 {
     $server = new OAuth2Server(
-        new AccessTokenVerificationPolicy(
+        new OAuth2VerificationPolicy(
             keys: ["keys" => [EXAMPLE_KEY_SET->toPublic()->all()]],
             kidRequired: true
         )

@@ -3,10 +3,6 @@ declare(strict_types=1);
 
 namespace gijsbos\ApiServer\OAuth2\Components;
 
-use gijsbos\ApiServer\Authentication\AuthenticationHeaderParser;
-use gijsbos\ApiServer\Authentication\AuthenticationVerifier;
-use gijsbos\Http\Exceptions\UnauthorizedException;
-
 /**
  * AccessTokenClaimToListConverter
  */

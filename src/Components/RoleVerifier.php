@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace gijsbos\ApiServer\OAuth2\Components;
 
 use gijsbos\ApiServer\Attributes\Route;
-use gijsbos\ApiServer\Interfaces\AuthorityCheckInterface;
+use gijsbos\ApiServer\Interfaces\RouteAuthorityVerifierInterface;
 use gijsbos\Http\Exceptions\ForbiddenException;
 use gijsbos\Http\Exceptions\InternalServerErrorException;
 
@@ -18,19 +18,17 @@ use gijsbos\Http\Exceptions\InternalServerErrorException;
  *  RFC 6750 §3.1's "insufficient_scope" (this package uses camelCase error codes
  *  throughout). "roles" takes precedence over "role" when both are present.
  */
-final class RoleVerifier implements AuthorityCheckInterface
+final class RoleVerifier implements RouteAuthorityVerifierInterface
 {
     public function __construct()
     { }
 
     public function execute(Route $route, array $requiredRoles)
     {
-        $authenticationResult = $route->getServer()->getAuthenticationResult();
+        $payload = $route->getServer()->getAuthorizationResult();
 
-        if(!$authenticationResult || !is_array($authenticationResult->getData()))
+        if(!is_array($payload))
             throw new InternalServerErrorException("authenticationResultEmpty", "Cannot verify role, authentication result data empty");
-
-        $payload = $authenticationResult->getData();
 
         if(array_key_exists("roles", $payload))
             $payloadRoles = $payload["roles"];

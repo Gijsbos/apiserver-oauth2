@@ -284,10 +284,26 @@ class AuthorityRouteTest extends TestCase
             "prefix of required" => [["roles" => "test"]],
             "extension of required" => [["roles" => "test-role-extra"]],
             "case differs" => [["roles" => "TEST-ROLE"]],
-            "role is not a string or array" => [["roles" => 7]],
-            "boolean role does not match any role" => [["roles" => [true]]],
-            "array with a non-string entry" => [["roles" => ["test-role", 7]]],
+            "singular role is not a string or array" => [["role" => 7]],
+            "boolean singular role does not match any role" => [["role" => [true]]],
+            "singular role array with a non-string entry" => [["role" => ["test-role", 7]]],
             "scope claim is not a role" => [["scp" => "test-role"]],
+        ];
+    }
+
+    #[DataProvider('malformedRolesClaims')]
+    public function testMalformedRolesClaimRejectsTheToken(array $claims) : void
+    {
+        // "roles" is a common TokenPayload claim, so it is validated when the token is verified
+        $this->assertDenied($this->request("hasRole", JwtFactory::mint($claims)), 401, "tokenPayloadInvalid");
+    }
+
+    public static function malformedRolesClaims() : array
+    {
+        return [
+            "roles is not a string or array" => [["roles" => 7]],
+            "boolean roles entry" => [["roles" => [true]]],
+            "roles array with a non-string entry" => [["roles" => ["test-role", 7]]],
         ];
     }
 

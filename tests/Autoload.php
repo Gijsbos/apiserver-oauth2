@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 use gijsbos\ApiServer\Cors;
-use gijsbos\ApiServer\OAuth2\Components\AccessTokenVerificationPolicy;
+use gijsbos\ApiServer\OAuth2\Components\OAuth2VerificationPolicy;
 use gijsbos\ApiServer\OAuth2\OAuth2Server;
 use gijsbos\ApiServer\Parsers\RouteParser;
 use gijsbos\ApiServer\SecurityContext;

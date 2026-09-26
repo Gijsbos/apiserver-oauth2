@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "d12a84de688b33d37f806809fe36ed8f",
+    "content-hash": "d06bfeb6ae954c273a051eb8bb4a076d",
     "packages": [
         {
             "name": "brick/math",
@@ -135,25 +135,25 @@
         },
         {
             "name": "gijsbos/apiserver",
-            "version": "1.14",
+            "version": "1.16",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Gijsbos/apiserver.git",
-                "reference": "9e2705ffaacfdd369449548b9953372beddb22f1"
+                "reference": "639f0f02c7dac03963336bb4a2fe0a729b371fa9"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Gijsbos/apiserver/zipball/9e2705ffaacfdd369449548b9953372beddb22f1",
-                "reference": "9e2705ffaacfdd369449548b9953372beddb22f1",
+                "url": "https://api.github.com/repos/Gijsbos/apiserver/zipball/639f0f02c7dac03963336bb4a2fe0a729b371fa9",
+                "reference": "639f0f02c7dac03963336bb4a2fe0a729b371fa9",
                 "shasum": ""
             },
             "require": {
-                "gijsbos/classparser": "^2.1",
-                "gijsbos/extfuncs": "^1.5",
-                "gijsbos/http": "^1.2",
-                "gijsbos/logging": "^1.3",
-                "gijsbos/php-cli-parser": "^1.0",
-                "gijsbos/stringfuncs": "^1.2"
+                "gijsbos/classparser": "^2.1.2",
+                "gijsbos/extfuncs": "^1.7",
+                "gijsbos/http": "^1.4",
+                "gijsbos/logging": "^1.4",
+                "gijsbos/php-cli-parser": "^1.1",
+                "gijsbos/stringfuncs": "^1.4.1"
             },
             "require-dev": {
                 "phpunit/phpunit": "^10.0"
@@ -183,9 +183,9 @@
             ],
             "support": {
                 "issues": "https://github.com/Gijsbos/apiserver/issues",
-                "source": "https://github.com/Gijsbos/apiserver/tree/1.14"
+                "source": "https://github.com/Gijsbos/apiserver/tree/1.16"
             },
-            "time": "2026-09-19T22:23:45+00:00"
+            "time": "2026-09-26T06:06:16+00:00"
         },
         {
             "name": "gijsbos/classparser",
@@ -237,16 +237,16 @@
         },
         {
             "name": "gijsbos/extfuncs",
-            "version": "1.6.10",
+            "version": "1.7",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Gijsbos/extfuncs.git",
-                "reference": "055ab8d22f8e91df4ea367a4c015349c2cfc3e4f"
+                "reference": "98081a6e09af7fd5aadeaffb09dace45702c21bb"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Gijsbos/extfuncs/zipball/055ab8d22f8e91df4ea367a4c015349c2cfc3e4f",
-                "reference": "055ab8d22f8e91df4ea367a4c015349c2cfc3e4f",
+                "url": "https://api.github.com/repos/Gijsbos/extfuncs/zipball/98081a6e09af7fd5aadeaffb09dace45702c21bb",
+                "reference": "98081a6e09af7fd5aadeaffb09dace45702c21bb",
                 "shasum": ""
             },
             "require": {
@@ -282,27 +282,27 @@
             ],
             "support": {
                 "issues": "https://github.com/Gijsbos/extfuncs/issues",
-                "source": "https://github.com/Gijsbos/extfuncs/tree/1.6.10"
+                "source": "https://github.com/Gijsbos/extfuncs/tree/1.7"
             },
-            "time": "2026-03-06T08:13:23+00:00"
+            "time": "2026-09-26T05:41:30+00:00"
         },
         {
             "name": "gijsbos/http",
-            "version": "1.3",
+            "version": "1.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Gijsbos/http.git",
-                "reference": "b33d40b961d67c887c7ac3b28ac9d0b016a3248a"
+                "reference": "b8ae26cfd897bb783352b4c78f0e9480bc1350dc"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Gijsbos/http/zipball/b33d40b961d67c887c7ac3b28ac9d0b016a3248a",
-                "reference": "b33d40b961d67c887c7ac3b28ac9d0b016a3248a",
+                "url": "https://api.github.com/repos/Gijsbos/http/zipball/b8ae26cfd897bb783352b4c78f0e9480bc1350dc",
+                "reference": "b8ae26cfd897bb783352b4c78f0e9480bc1350dc",
                 "shasum": ""
             },
             "require": {
-                "gijsbos/extfuncs": "^1.6.10",
-                "gijsbos/logging": "^1.3"
+                "gijsbos/extfuncs": "^1.7",
+                "gijsbos/logging": "^1.4"
             },
             "require-dev": {
                 "phpunit/phpunit": "^5.7 || ^9.0"
@@ -332,26 +332,26 @@
             ],
             "support": {
                 "issues": "https://github.com/Gijsbos/http/issues",
-                "source": "https://github.com/Gijsbos/http/tree/1.3"
+                "source": "https://github.com/Gijsbos/http/tree/1.4"
             },
-            "time": "2026-09-17T08:24:35+00:00"
+            "time": "2026-09-26T05:59:13+00:00"
         },
         {
             "name": "gijsbos/logging",
-            "version": "1.3.13",
+            "version": "1.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Gijsbos/logging.git",
-                "reference": "b90a14f69960aebe4304540201753f77e836b1c2"
+                "reference": "f336285d474a68a587656207512dfedd01ea62a9"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Gijsbos/logging/zipball/b90a14f69960aebe4304540201753f77e836b1c2",
-                "reference": "b90a14f69960aebe4304540201753f77e836b1c2",
+                "url": "https://api.github.com/repos/Gijsbos/logging/zipball/f336285d474a68a587656207512dfedd01ea62a9",
+                "reference": "f336285d474a68a587656207512dfedd01ea62a9",
                 "shasum": ""
             },
             "require": {
-                "gijsbos/extfuncs": "^1.0"
+                "php": "^8.0"
             },
             "require-dev": {
                 "phpunit/phpunit": "^5.7 || ^9.0"
@@ -381,9 +381,9 @@
             ],
             "support": {
                 "issues": "https://github.com/Gijsbos/logging/issues",
-                "source": "https://github.com/Gijsbos/logging/tree/1.3.13"
+                "source": "https://github.com/Gijsbos/logging/tree/1.4"
             },
-            "time": "2026-08-14T08:44:12+00:00"
+            "time": "2026-09-26T05:52:51+00:00"
         },
         {
             "name": "gijsbos/php-cli-parser",
@@ -437,17 +437,20 @@
         },
         {
             "name": "gijsbos/stringfuncs",
-            "version": "1.3.7",
+            "version": "1.4.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Gijsbos/stringfuncs.git",
-                "reference": "f1cbea3e82208db69058268f6a9fbb723438d9c1"
+                "reference": "d7b7417b68443d378fb5f094ef3d6168076f02e9"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Gijsbos/stringfuncs/zipball/f1cbea3e82208db69058268f6a9fbb723438d9c1",
-                "reference": "f1cbea3e82208db69058268f6a9fbb723438d9c1",
+                "url": "https://api.github.com/repos/Gijsbos/stringfuncs/zipball/d7b7417b68443d378fb5f094ef3d6168076f02e9",
+                "reference": "d7b7417b68443d378fb5f094ef3d6168076f02e9",
                 "shasum": ""
+            },
+            "require": {
+                "php": ">=8.0"
             },
             "require-dev": {
                 "phpunit/phpunit": "^5.7 || ^9.0"
@@ -468,7 +471,7 @@
             "authors": [
                 {
                     "name": "Gijs and contributors",
-                    "homepage": "https://github.com/gijsbos/yamlspeed/graphs/contributors"
+                    "homepage": "https://github.com/gijsbos/stringfuncs/graphs/contributors"
                 }
             ],
             "description": "PHP String Functions",
@@ -477,9 +480,9 @@
             ],
             "support": {
                 "issues": "https://github.com/Gijsbos/stringfuncs/issues",
-                "source": "https://github.com/Gijsbos/stringfuncs/tree/1.3.7"
+                "source": "https://github.com/Gijsbos/stringfuncs/tree/1.4.1"
             },
-            "time": "2025-11-22T15:14:58+00:00"
+            "time": "2026-09-26T06:05:00+00:00"
         },
         {
             "name": "paragonie/random_compat",

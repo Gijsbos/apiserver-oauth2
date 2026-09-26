@@ -7,8 +7,9 @@ use Psr\Clock\ClockInterface;
 use gijsbos\ApiServer\OAuth2\Certificate\CertificateProvider;
 use gijsbos\ApiServer\OAuth2\Certificate\CertificateProviderInterface;
 use gijsbos\ApiServer\OAuth2\Certificate\CertificateSet;
-use gijsbos\ApiServer\OAuth2\Components\AccessTokenVerificationPolicy;
+use gijsbos\ApiServer\OAuth2\Components\OAuth2VerificationPolicy;
 use gijsbos\ApiServer\OAuth2\Components\AccessTokenVerifier;
+use gijsbos\ApiServer\OAuth2\ValueObjects\TokenPayload;
 use gijsbos\Http\Exceptions\ForbiddenException;
 use gijsbos\Http\Exceptions\UnauthorizedException;
 use Jose\Component\Core\JWK;
@@ -22,11 +23,11 @@ use Jose\Component\Signature\Algorithm\RS384;
  */
 class AccessTokenVerifierTest extends TestCase
 {
-    private function policy(mixed ...$policyArgs) : AccessTokenVerificationPolicy
+    private function policy(mixed ...$policyArgs) : OAuth2VerificationPolicy
     {
         $policyArgs += ["keys" => ["keys" => [JwtFactory::publicKey()]]];
 
-        return new AccessTokenVerificationPolicy(...$policyArgs);
+        return new OAuth2VerificationPolicy(...$policyArgs);
     }
 
     private function verifier() : AccessTokenVerifier
@@ -34,7 +35,7 @@ class AccessTokenVerifierTest extends TestCase
         return new AccessTokenVerifier(new CertificateProvider());
     }
 
-    private function verify(string $accessToken) : array
+    private function verify(string $accessToken) : TokenPayload
     {
         return $this->verifier()->verify($this->policy(), $accessToken);
     }
@@ -62,15 +63,31 @@ class AccessTokenVerifierTest extends TestCase
     {
         $payload = $this->verify(JwtFactory::mint(["scp" => "a b", "custom" => ["nested" => true]]));
 
-        $this->assertEquals("test-user", $payload["sub"]);
-        $this->assertEquals("a b", $payload["scp"]);
-        $this->assertEquals(["nested" => true], $payload["custom"]);
+        $this->assertEquals("test-user", $payload->getSub());
+        $this->assertEquals("a b", $payload->getClaim("scp"));
+        $this->assertEquals(["nested" => true], $payload->getClaim("custom"));
     }
 
     public function testMalformedTokensAreRejectedAsInvalid() : void
     {
         foreach(["", "abc", "a.b", "a.b.c.d.e"] as $token)
             $this->assertRejected("tokenInvalid", fn() => $this->verify($token));
+    }
+
+    public function testEmptyPayloadIsRejectedAsInvalid() : void
+    {
+        // An empty payload segment makes JWSVerifier throw instead of return false; that must not escape as a server error
+        $b64 = fn(string $json) => rtrim(strtr(base64_encode($json), '+/', '-_'), '=');
+
+        foreach([["alg" => "RS256", "kid" => JwtFactory::kid()], ["alg" => "RS256"]] as $header)
+            $this->assertRejected("tokenInvalid", fn() => $this->verify($b64(json_encode($header)) . "..c2lnbmF0dXJl"));
+    }
+
+    public function testPolicyWithoutKeySourceIsAServerErrorNotARejectedToken() : void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        $this->verifier()->verify(new OAuth2VerificationPolicy(), JwtFactory::mint());
     }
 
     public function testTamperedPayloadIsRejected() : void
@@ -110,7 +127,7 @@ class AccessTokenVerifierTest extends TestCase
 
     public function testNotBeforeInThePastIsAccepted() : void
     {
-        $this->assertArrayHasKey("nbf", $this->verify(JwtFactory::mint(["nbf" => time() - 600])));
+        $this->assertNotNull($this->verify(JwtFactory::mint(["nbf" => time() - 600]))->getNbf());
     }
 
     // ---------------------------------------------------------------------
@@ -140,7 +157,7 @@ class AccessTokenVerifierTest extends TestCase
     {
         $token = JwtFactory::mint(["exp" => time() + 3600]);
 
-        $this->assertEquals("test-user", $this->verifierWithClock($this->clockAt("+30 minutes"))->verify($this->policy(), $token)["sub"]);
+        $this->assertEquals("test-user", $this->verifierWithClock($this->clockAt("+30 minutes"))->verify($this->policy(), $token)->getSub());
         $this->assertRejected("tokenPayloadInvalid", fn() => $this->verifierWithClock($this->clockAt("+2 hours"))->verify($this->policy(), $token));
     }
 
@@ -149,25 +166,28 @@ class AccessTokenVerifierTest extends TestCase
         $token = JwtFactory::mint(["nbf" => time() + 3600, "exp" => time() + 7200 * 2]);
 
         $this->assertRejected("tokenPayloadInvalid", fn() => $this->verifierWithClock($this->clockAt("now"))->verify($this->policy(), $token));
-        $this->assertEquals("test-user", $this->verifierWithClock($this->clockAt("+2 hours"))->verify($this->policy(), $token)["sub"]);
+        $this->assertEquals("test-user", $this->verifierWithClock($this->clockAt("+2 hours"))->verify($this->policy(), $token)->getSub());
     }
 
     // ---------------------------------------------------------------------
     // Injected certificate provider
     // ---------------------------------------------------------------------
 
-    private function providerFor(array $keys, int &$calls = 0) : CertificateProviderInterface
+    private function providerFor(array $keys, int &$calls = 0, null|array $refreshedKeys = null, int &$refreshes = 0) : CertificateProviderInterface
     {
-        return new class($keys, $calls) implements CertificateProviderInterface
+        return new class($keys, $calls, $refreshedKeys, $refreshes) implements CertificateProviderInterface
         {
-            public function __construct(private array $keys, private int &$calls)
+            public function __construct(private array $keys, private int &$calls, private null|array $refreshedKeys, private int &$refreshes)
             { }
 
-            public function provide(AccessTokenVerificationPolicy $accessTokenVerificationPolicy) : CertificateSet
+            public function provide(OAuth2VerificationPolicy $oAuth2VerificationPolicy, bool $refresh = false) : CertificateSet
             {
                 $this->calls++;
 
-                return new CertificateSet($this->keys);
+                if($refresh)
+                    $this->refreshes++;
+
+                return new CertificateSet($refresh && $this->refreshedKeys !== null ? $this->refreshedKeys : $this->keys);
             }
         };
     }
@@ -175,17 +195,51 @@ class AccessTokenVerifierTest extends TestCase
     public function testKeysComeFromTheInjectedProviderNotThePolicy() : void
     {
         // The policy holds a key that cannot verify the token; only the provider's key can
-        $policy = new AccessTokenVerificationPolicy(keys: ["keys" => [JwtFactory::foreignKey()->toPublic()->all()]]);
+        $policy = new OAuth2VerificationPolicy(keys: ["keys" => [JwtFactory::foreignKey()->toPublic()->all()]]);
         $calls = 0;
         $verifier = new AccessTokenVerifier($this->providerFor([JwtFactory::publicKey()], $calls));
 
-        $this->assertEquals("test-user", $verifier->verify($policy, JwtFactory::mint())["sub"]);
+        $this->assertEquals("test-user", $verifier->verify($policy, JwtFactory::mint())->getSub());
         $this->assertEquals(1, $calls);
+    }
+
+    public function testUnknownKidRefreshesTheKeysOnce() : void
+    {
+        // The cached set predates a key rotation; the refreshed set holds the key the token was signed with
+        $policy = $this->policy();
+        $calls = 0;
+        $refreshes = 0;
+        $verifier = new AccessTokenVerifier($this->providerFor([], $calls, [JwtFactory::publicKey()], $refreshes));
+
+        $this->assertEquals("test-user", $verifier->verify($policy, JwtFactory::mint())->getSub());
+        $this->assertEquals(2, $calls);
+        $this->assertEquals(1, $refreshes);
+    }
+
+    public function testKnownKidDoesNotRefreshTheKeys() : void
+    {
+        $refreshes = 0;
+        $calls = 0;
+        $verifier = new AccessTokenVerifier($this->providerFor([JwtFactory::publicKey()], $calls, [], $refreshes));
+
+        $verifier->verify($this->policy(), JwtFactory::mint());
+
+        $this->assertEquals(0, $refreshes);
+    }
+
+    public function testKidStillUnknownAfterRefreshIsRejected() : void
+    {
+        $refreshes = 0;
+        $calls = 0;
+        $verifier = new AccessTokenVerifier($this->providerFor([], $calls, [], $refreshes));
+
+        $this->assertRejected("tokenKeyNotFound", fn() => $verifier->verify($this->policy(), JwtFactory::mint()));
+        $this->assertEquals(1, $refreshes);
     }
 
     public function testEmptyProvidedSetRejectsTokensWithKid() : void
     {
-        $policy = new AccessTokenVerificationPolicy(keys: ["keys" => []]);
+        $policy = new OAuth2VerificationPolicy(keys: ["keys" => []]);
         $verifier = new AccessTokenVerifier($this->providerFor([]));
 
         $this->assertRejected("tokenKeyNotFound", fn() => $verifier->verify($policy, JwtFactory::mint()));
@@ -193,7 +247,7 @@ class AccessTokenVerifierTest extends TestCase
 
     public function testEmptyProvidedSetRejectsTokensWithoutKid() : void
     {
-        $policy = new AccessTokenVerificationPolicy(keys: ["keys" => []]);
+        $policy = new OAuth2VerificationPolicy(keys: ["keys" => []]);
         $verifier = new AccessTokenVerifier($this->providerFor([]));
 
         $this->assertRejected("tokenKeyInvalid", fn() => $verifier->verify($policy, JwtFactory::mint([], ["alg" => "RS256"])));
@@ -214,7 +268,7 @@ class AccessTokenVerifierTest extends TestCase
     {
         $token = JwtFactory::mint([], ["alg" => "RS256"]);
 
-        $this->assertEquals("test-user", $this->verifier()->verify($this->policy(kidRequired: false), $token)["sub"]);
+        $this->assertEquals("test-user", $this->verifier()->verify($this->policy(kidRequired: false), $token)->getSub());
     }
 
     public function testUnknownKidIsRejected() : void
@@ -229,7 +283,7 @@ class AccessTokenVerifierTest extends TestCase
         $decoy = array_merge(JwtFactory::foreignKey()->toPublic()->all(), ["kid" => "decoy"]);
         $policy = $this->policy(keys: ["keys" => [$decoy, JwtFactory::publicKey()]]);
 
-        $this->assertEquals("test-user", $this->verifier()->verify($policy, JwtFactory::mint())["sub"]);
+        $this->assertEquals("test-user", $this->verifier()->verify($policy, JwtFactory::mint())->getSub());
     }
 
     public function testInvalidKeyInKeySetIsRejectedWhenTokenHasNoKid() : void
@@ -274,14 +328,14 @@ class AccessTokenVerifierTest extends TestCase
 
     public function testIssuerIsNotCheckedWhenNoIssuerUriIsConfigured() : void
     {
-        $this->assertEquals("https://anything", $this->verify(JwtFactory::mint(["iss" => "https://anything"]))["iss"]);
+        $this->assertEquals("https://anything", $this->verify(JwtFactory::mint(["iss" => "https://anything"]))->getIss());
     }
 
     public function testIssuerMustMatchWhenConfigured() : void
     {
         $policy = $this->policy(issuerUri: "https://issuer.example.com");
 
-        $this->assertEquals("https://issuer.example.com", $this->verifier()->verify($policy, JwtFactory::mint(["iss" => "https://issuer.example.com"]))["iss"]);
+        $this->assertEquals("https://issuer.example.com", $this->verifier()->verify($policy, JwtFactory::mint(["iss" => "https://issuer.example.com"]))->getIss());
         $this->assertRejected("tokenPayloadInvalid", fn() => $this->verifier()->verify($policy, JwtFactory::mint(["iss" => "https://evil.example.com"])));
     }
 
@@ -294,14 +348,14 @@ class AccessTokenVerifierTest extends TestCase
 
     public function testAudienceIsNotCheckedWhenNotConfigured() : void
     {
-        $this->assertEquals("whatever", $this->verify(JwtFactory::mint(["aud" => "whatever"]))["aud"]);
+        $this->assertEquals("whatever", $this->verify(JwtFactory::mint(["aud" => "whatever"]))->getAud());
     }
 
     public function testAudienceMustMatchWhenConfigured() : void
     {
         $policy = $this->policy(audience: "api");
 
-        $this->assertEquals("api", $this->verifier()->verify($policy, JwtFactory::mint(["aud" => "api"]))["aud"]);
+        $this->assertEquals("api", $this->verifier()->verify($policy, JwtFactory::mint(["aud" => "api"]))->getAud());
         $this->assertRejected("tokenPayloadInvalid", fn() => $this->verifier()->verify($policy, JwtFactory::mint(["aud" => "other"])));
     }
 
@@ -309,7 +363,7 @@ class AccessTokenVerifierTest extends TestCase
     {
         $policy = $this->policy(audience: "api");
 
-        $this->assertEquals(["other", "api"], $this->verifier()->verify($policy, JwtFactory::mint(["aud" => ["other", "api"]]))["aud"]);
+        $this->assertEquals(["other", "api"], $this->verifier()->verify($policy, JwtFactory::mint(["aud" => ["other", "api"]]))->getAud());
     }
 
     public function testAudienceBecomesMandatoryWhenConfigured() : void

@@ -18,7 +18,7 @@ URL, or discovered via OpenID Connect (`.well-known/openid-configuration`) — a
 `#[RequiresAuthority]` mechanism.
 
 apiserver itself stays OAuth2-ignorant: `SecurityContext` only decides whether a path needs *some*
-credential, and `RequiresAuthority` only knows how to run a pluggable `AuthorityCheckInterface`. This
+credential, and `RequiresAuthority` only knows how to run a pluggable `RouteAuthorityVerifierInterface`. This
 package supplies the OAuth2-specific pieces on top of that: token verification, key resolution, and two
 ready-made checks (`HasScope`, `HasRole`).
 
@@ -44,9 +44,9 @@ composer require gijsbos/apiserver-oauth2
 ### 1. Define a verification policy
 
 ```php
-use gijsbos\ApiServer\OAuth2\Components\AccessTokenVerificationPolicy;
+use gijsbos\ApiServer\OAuth2\Components\OAuth2VerificationPolicy;
 
-$policy = new AccessTokenVerificationPolicy(
+$policy = new OAuth2VerificationPolicy(
     issuerUri: "https://issuer.example.com",     // used for OIDC discovery and to validate the "iss" claim
     keysUri: "https://issuer.example.com/keys",  // or supply "keys" directly, or omit and rely on issuerUri alone
     audience: "your-api-audience",               // optional - validates the "aud" claim
@@ -54,9 +54,22 @@ $policy = new AccessTokenVerificationPolicy(
 );
 ```
 
-At least one of `keys`, `keysUri`, or `issuerUri` must be set, and `allowedAlgorithms` (default: RS256) must
+At least one of `keys`, `keysUri`, or `issuerUri` must be set (checked when keys are first needed), and `allowedAlgorithms` (default: RS256) must
 not be empty. See the class docblock for the full precedence order between the key sources
 (`keys` > `keysUri` > `issuerUri`) and what each one does to `iss` validation.
+
+Keys fetched from `keysUri` / `issuerUri` are cached in process memory and in APCu (when available). The
+defaults can be changed through static properties of `CertificateProvider`:
+
+| Property | Default | Meaning |
+| --- | --- | --- |
+| `$CACHE_TTL_SECONDS` | `3600` | How long fetched keys are cached. |
+| `$REFRESH_COOLDOWN_SECONDS` | `60` | A token whose `kid` is not in the cached keys (e.g. after a key rotation) triggers a refetch, at most once per this period. |
+| `$FAILURE_CACHE_TTL_SECONDS` | `30` | How long a failed fetch is remembered, so an unreachable issuer does not slow down every request. |
+| `$HTTP_TIMEOUT_SECONDS` / `$HTTP_CONNECT_TIMEOUT_SECONDS` | `5` / `3` | Timeouts of a single fetch. |
+
+With OpenID Connect discovery, the configuration document's `issuer` must match `issuerUri` (a trailing slash
+aside), otherwise the keys are not used.
 
 ### 2. Use `OAuth2Server` instead of `Server` in your entrypoint
 
@@ -70,7 +83,7 @@ $server = new OAuth2Server($policy, [
 $server->listen();
 ```
 
-`OAuth2Server` takes the policy as its first argument and wires `AuthenticationVerifier::$viaBearer` from it,
+`OAuth2Server` takes the policy as its first argument and wires `AuthorizationHeaderVerifier::$viaBearer` from it,
 so any `#[RequiresAuthority]`-based check — including `SecurityContext`-gated paths and `HasScope` /
 `HasRole` — can verify Bearer tokens with no further setup. Only the Bearer scheme is supported; `Basic`
 credentials are rejected with `schemeNotSupported`.
@@ -130,15 +143,15 @@ Token problems are `401` responses: `authorizationRequired`, `authorizationHeade
 
 ### Custom authority checks
 
-For anything beyond scope/role, implement `AuthorityCheckInterface` yourself and use apiserver's
+For anything beyond scope/role, implement `RouteAuthorityVerifierInterface` yourself and use apiserver's
 `#[RequiresAuthority]` directly:
 
 ```php
 use gijsbos\ApiServer\Attributes\Route;
 use gijsbos\ApiServer\Attributes\RequiresAuthority;
-use gijsbos\ApiServer\Interfaces\AuthorityCheckInterface;
+use gijsbos\ApiServer\Interfaces\RouteAuthorityVerifierInterface;
 
-class IsAccountOwnerCheck implements AuthorityCheckInterface
+class IsAccountOwnerCheck implements RouteAuthorityVerifierInterface
 {
     public function execute(Route $route, array $authority)
     {
@@ -160,9 +173,9 @@ beyond what this package ships.
 | Class | Purpose |
 | --- | --- |
 | `OAuth2Server` | Extends `Server`; wires OAuth2 bearer-token verification from a registered policy. |
-| `AccessTokenVerificationPolicy` | Configures issuer, key source, audience, allowed algorithms, `kid` requirement. |
-| `AccessTokenVerifier` | Verifies a JWT's header, signature, and standard claims (`exp`, `nbf`, `iss`, `aud`) against a policy. |
-| `JwksResolver` | Fetches public keys directly, from a URL, or via OpenID Connect discovery; caches in APCu when available. |
+| `OAuth2VerificationPolicy` | Configures issuer, key source, audience, allowed algorithms, `kid` requirement. |
+| `AccessTokenVerifier` | Verifies a JWT's header, signature, and standard claims (`exp`, `nbf`, `iss`, `aud`) against a policy. Returns a `TokenPayload`. |
+| `CertificateProvider` | Provides the policy's keys directly, or fetches them from a JWKS URL or via OpenID Connect discovery; caches in APCu when available. |
 | `SystemClock` | Default PSR-20 clock for `exp`/`nbf` checks. `AccessTokenVerifier` accepts any `Psr\Clock\ClockInterface`, e.g. a frozen clock in tests. |
 | `HasScope` / `ScopeVerifier` | Route attribute + backing check for scope-gated authorization. |
 | `HasRole` / `RoleVerifier` | Route attribute + backing check for role-gated authorization. |
