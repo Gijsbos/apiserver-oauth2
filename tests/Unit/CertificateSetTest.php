@@ -54,18 +54,33 @@ class CertificateSetTest extends TestCase
         $this->assertTrue($set->hasKid(JwtFactory::kid()));
     }
 
-    public function testRejectsDataWithoutAKeysArray() : void
+    public function testRejectsMalformedData() : void
     {
-        foreach([[JwtFactory::publicKey()], [], ["keys" => "not an array"]] as $data)
+        $malformed = [
+            "bare list of keys" => [JwtFactory::publicKey()],
+            "empty array" => [],
+            "keys not an array" => ["keys" => "not an array"],
+            "key not an array" => ["keys" => ["abc"]],
+            "key not an object" => ["keys" => [["a", "b"]]],
+            "no keys and no kty" => ["foo" => "bar"],
+            "keys as object" => ["keys" => ["a" => JwtFactory::publicKey()]],
+        ];
+
+        foreach($malformed as $data)
             $this->assertThrowsError(InternalServerErrorException::class, "malformedCertificateSet", fn() => CertificateSet::createFromArray($data));
     }
 
     public function testArrayIsCertificateSet() : void
     {
         $this->assertTrue(CertificateSet::arrayIsCertificateSet(["keys" => []]));
+        $this->assertTrue(CertificateSet::arrayIsCertificateSet(["keys" => [JwtFactory::publicKey()]]));
+        $this->assertFalse(CertificateSet::arrayIsCertificateSet([JwtFactory::publicKey()]), "A bare list is no JWK Set");
         $this->assertFalse(CertificateSet::arrayIsCertificateSet(JwtFactory::publicKey()));
         $this->assertFalse(CertificateSet::arrayIsCertificateSet(["keys" => null]));
+        $this->assertTrue(CertificateSet::arrayIsCertificateSet(["keys" => [["kid" => "k1"]]]), "An unusable key does not make the set malformed (RFC 7517 §5)");
+        $this->assertFalse(CertificateSet::arrayIsCertificateSet(["keys" => ["abc"]]));
     }
+
 
     // ---------------------------------------------------------------------
     // kid lookup / accessors
@@ -200,5 +215,37 @@ class CertificateSetTest extends TestCase
     public function testRejectsAnAssociativeArrayWithoutKty() : void
     {
         $this->assertThrowsError(UnauthorizedException::class, "tokenKeyInvalid", fn() => CertificateSet::convertToJWKSet(["foo" => "bar"]));
+    }
+
+    // ---------------------------------------------------------------------
+    // toPublicKeys()
+    // ---------------------------------------------------------------------
+
+    public function testToPublicKeysRemovesPrivateMembers() : void
+    {
+        $privateRsa = ["kty" => "RSA", "kid" => "rsa", "n" => "n", "e" => "AQAB", "d" => "d", "p" => "p", "q" => "q", "dp" => "dp", "dq" => "dq", "qi" => "qi"];
+        $privateEc = ["kty" => "EC", "kid" => "ec", "crv" => "P-256", "x" => "x", "y" => "y", "d" => "d"];
+
+        $publicKeys = (new CertificateSet([$privateRsa, $privateEc]))->toPublicKeys();
+
+        $this->assertSame([
+            "keys" => [
+                ["kty" => "RSA", "kid" => "rsa", "n" => "n", "e" => "AQAB"],
+                ["kty" => "EC", "kid" => "ec", "crv" => "P-256", "x" => "x", "y" => "y"],
+            ],
+        ], $publicKeys);
+    }
+
+    public function testToPublicKeysLeavesOutSymmetricKeys() : void
+    {
+        $publicKeys = (new CertificateSet([JwtFactory::publicKey(), ["kty" => "oct", "kid" => "hmac", "k" => "secret"]]))->toPublicKeys();
+
+        $this->assertCount(1, $publicKeys["keys"]);
+        $this->assertNotSame("oct", $publicKeys["keys"][0]["kty"]);
+    }
+
+    public function testToPublicKeysKeepsPublicKeysAsTheyAre() : void
+    {
+        $this->assertSame(["keys" => [JwtFactory::publicKey()]], (new CertificateSet([JwtFactory::publicKey()]))->toPublicKeys());
     }
 }

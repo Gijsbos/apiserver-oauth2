@@ -43,6 +43,31 @@ class CertificateSet
         ];
     }
 
+    /* JWK members that are private (RFC 7518 §6, RFC 8037 §2): never part of a public key */
+    const PRIVATE_KEY_MEMBERS = ["d", "p", "q", "dp", "dq", "qi", "oth", "k"];
+
+    /**
+     * toPublicKeys
+     *  The set as public JWK Set {"keys": [...]}, e.g. for a jwks_uri: private members are removed from every key and symmetric
+     *  keys (kty "oct", their only material is secret) are left out. Safe to publish whatever keys the set holds.
+     */
+    public function toPublicKeys() : array
+    {
+        $keys = [];
+
+        foreach($this->keys as $key)
+        {
+            if(!is_array($key) || ($key["kty"] ?? null) === "oct")
+                continue;
+
+            $keys[] = array_diff_key($key, array_flip(self::PRIVATE_KEY_MEMBERS));
+        }
+
+        return [
+            "keys" => $keys,
+        ];
+    }
+
     public function toJWKSet() : JWKSet
     {
         return self::convertToJWKSet($this->toKeysData());
@@ -58,7 +83,7 @@ class CertificateSet
      */
     public function addCertificateData(array $certificateData)
     {
-        $certificates = self::arrayIsCertificateSet($certificateData) ? $certificateData["keys"] : [$certificateData];
+        $certificates = self::arrayIsCertificateSet($certificateData) ? self::keysOf($certificateData) : [$certificateData];
 
         foreach($certificates as $certificate)
             if(!is_array($certificate) || !$this->certificateContainsRequiredKeys($certificate))
@@ -67,22 +92,52 @@ class CertificateSet
         array_push($this->keys, ...$certificates);
     }
 
-    public static function arrayIsCertificateSet(array $data)
+    /**
+     * keysOf
+     *  The keys of a JWK Set {"keys": [...]} (RFC 7517 §5), null when $data is no JWK Set
+     */
+    private static function keysOf(array $data) : null|array
     {
-        return array_key_exists("keys", $data) && is_array($data["keys"]);
+        if(!array_key_exists("keys", $data))
+            return null;
+
+        return is_array($data["keys"]) && array_is_list($data["keys"]) ? $data["keys"] : null;
     }
 
+    /**
+     * arrayIsCertificateSet
+     *  A JWK Set {"keys": [...]}, every key a JSON object. An empty set is valid, a bare list of keys is not.
+     *  The contents of a key are not checked here: a key that cannot be used (e.g. without "kty") is ignored when keys are
+     *  used, it does not make the set unusable (RFC 7517 §5), a token that needs it is rejected then.
+     */
+    public static function arrayIsCertificateSet(array $data) : bool
+    {
+        $keys = self::keysOf($data);
+
+        if($keys === null)
+            return false;
+
+        foreach($keys as $key)
+            if(!is_array($key) || ($key !== [] && array_is_list($key)))
+                return false;
+
+        return true;
+    }
+
+    /**
+     * createFromArray
+     *  A JWK Set {"keys": [...]} or a single key, see arrayIsCertificateSet
+     */
     public static function createFromArray(array $data)
     {
-        if(array_key_exists("kty", $data)) // when receiving a certificate instead, detect mandatory kty RFC 7517 §4.1 and add keys manually
+        // A single key instead of a set: detected by its mandatory "kty" (RFC 7517 §4.1)
+        if(array_key_exists("kty", $data))
             $data = ["keys" => [$data]];
 
         if(!self::arrayIsCertificateSet($data))
-        {
             throw new InternalServerErrorException("malformedCertificateSet", "Certificate set is malformed");
-        }
 
-        return new self($data["keys"]);
+        return new self(self::keysOf($data));
     }
 
     public static function convertToJWKSet(string|array|JWK|JWKSet $jwk) : JWKSet
