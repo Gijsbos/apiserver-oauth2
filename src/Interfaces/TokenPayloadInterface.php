@@ -16,7 +16,11 @@ interface TokenPayloadInterface
 
     public function getSub() : null|string;
 
+    public function hasSub() : bool;
+
     public function getAud() : null|string|array;
+
+    public function hasAnyAudience(string|array $audiences) : bool;
 
     public function getExp() : null|int;
 
@@ -28,7 +32,11 @@ interface TokenPayloadInterface
 
     public function getScope() : null|array;
 
+    public function getScopeString() : null|string;
+
     public function getRoles() : null|array;
+
+    public function getRolesString() : null|string;
 
     public function getClaim(string $name) : mixed;
 

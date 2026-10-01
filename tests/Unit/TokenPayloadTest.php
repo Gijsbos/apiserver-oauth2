@@ -87,6 +87,61 @@ class TokenPayloadTest extends TestCase
     }
 
     // ---------------------------------------------------------------------
+    // getScopeString() / getRolesString()
+    // ---------------------------------------------------------------------
+
+    public function testScopeAndRolesAsString() : void
+    {
+        $payload = new TokenPayload(scope: ["read", "write"], roles: "admin,editor");
+
+        $this->assertSame("read write", $payload->getScopeString());
+        $this->assertSame("admin editor", $payload->getRolesString());
+    }
+
+    public function testScopeAndRolesAsStringAreNullWhenNotSet() : void
+    {
+        $payload = new TokenPayload();
+
+        $this->assertNull($payload->getScopeString());
+        $this->assertNull($payload->getRolesString());
+    }
+
+    // ---------------------------------------------------------------------
+    // hasSub()
+    // ---------------------------------------------------------------------
+
+    public function testHasSub() : void
+    {
+        $this->assertTrue((new TokenPayload(sub: "user"))->hasSub());
+        $this->assertFalse((new TokenPayload(sub: ""))->hasSub());
+        $this->assertFalse((new TokenPayload())->hasSub());
+    }
+
+    // ---------------------------------------------------------------------
+    // hasAnyAudience()
+    // ---------------------------------------------------------------------
+
+    public static function hasAnyAudienceProvider() : array
+    {
+        return [
+            "string aud, match"             => ["client_a", ["client_a", "client_b"], true],
+            "string aud, no match"          => ["client_c", ["client_a", "client_b"], false],
+            "list aud, one match"           => [["client_c", "client_b"], ["client_a", "client_b"], true],
+            "list aud, no match"            => [["client_c", "client_d"], ["client_a", "client_b"], false],
+            "string audiences"              => [["client_a"], "client_a", true],
+            "no aud"                        => [null, ["client_a"], false],
+            "no audiences"                  => ["client_a", [], false],
+            "no prefix or case matching"    => ["client_a", ["client", "CLIENT_A"], false],
+        ];
+    }
+
+    #[DataProvider("hasAnyAudienceProvider")]
+    public function testHasAnyAudience(null|string|array $aud, string|array $audiences, bool $expected) : void
+    {
+        $this->assertSame($expected, (new TokenPayload(aud: $aud))->hasAnyAudience($audiences));
+    }
+
+    // ---------------------------------------------------------------------
     // Metadata
     // ---------------------------------------------------------------------
 

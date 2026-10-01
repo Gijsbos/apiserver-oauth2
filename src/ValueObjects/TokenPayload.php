@@ -80,9 +80,31 @@ class TokenPayload implements TokenPayloadInterface
         return $this->sub;
     }
 
+    /**
+     * hasSub
+     *  True when "sub" is set and not empty, an empty subject identifies no one
+     */
+    public function hasSub() : bool
+    {
+        return $this->sub !== null && $this->sub !== "";
+    }
+
     public function getAud() : null|string|array
     {
         return $this->aud;
+    }
+
+    /**
+     * hasAnyAudience
+     *  True when "aud" contains at least one of $audiences, e.g. the accepted client ids (OIDC Core §3.1.3.7 step 3)
+     */
+    public function hasAnyAudience(string|array $audiences) : bool
+    {
+        foreach((array) $audiences as $audience)
+            if(in_array($audience, (array) $this->aud, true))
+                return true;
+
+        return false;
     }
 
     public function setAud(null|string|array $aud = null)
@@ -120,9 +142,27 @@ class TokenPayload implements TokenPayloadInterface
         return $this->scope;
     }
 
+    /**
+     * getScopeString
+     *  The scope as space delimited string (RFC 6749 §3.3), null when not set
+     */
+    public function getScopeString() : null|string
+    {
+        return $this->scope !== null ? implode(" ", $this->scope) : null;
+    }
+
     public function getRoles() : null|array
     {
         return $this->roles;
+    }
+
+    /**
+     * getRolesString
+     *  The roles as space delimited string, null when not set
+     */
+    public function getRolesString() : null|string
+    {
+        return $this->roles !== null ? implode(" ", $this->roles) : null;
     }
 
     /**
@@ -175,7 +215,7 @@ class TokenPayload implements TokenPayloadInterface
 
         foreach(self::COMMON_CLAIMS as $claim)
             if(($value = $this->getClaim($claim)) !== null)
-                $claims[$claim] = $claim === "scope" ? implode(" ", $value) : $value;
+                $claims[$claim] = $claim === "scope" ? $this->getScopeString() : $value;
 
         // The + union rather than array_merge, which would renumber numeric custom claim names
         return $claims + $this->customClaims;
